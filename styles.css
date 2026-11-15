@@ -1,0 +1,286 @@
+:root {
+  --ink: #0b0f19;
+  --paper: #f4ecd8;
+  --plum: #45306a;
+  --lilac: #b9a8dd;
+  --mint: #3fd49a;
+  --rose: #c06a78;
+  --dusk: #1b1637;
+
+  --card-paper: var(--paper);
+  --card-ink: var(--ink);
+  --card-soft: var(--plum);
+
+  --pixel: 'Pixelify Sans', monospace;
+  --text: 'IBM Plex Sans', system-ui, sans-serif;
+  --edge: 4px;
+}
+
+:root.night {
+  --card-paper: var(--dusk);
+  --card-ink: var(--paper);
+  --card-soft: var(--lilac);
+}
+
+body {
+  margin: 0;
+  background: var(--dusk);
+  color: var(--ink);
+  font-family: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 3px solid var(--mint);
+}
+
+a:hover {
+  background: var(--mint);
+  color: var(--ink);
+}
+
+button {
+  font-family: var(--pixel);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--mint);
+  color: var(--ink);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--mint);
+  outline-offset: 3px;
+}
+
+/* The painting */
+#scene {
+  position: fixed;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+main {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 72px 16px 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* The card */
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  box-sizing: border-box;
+  padding: 28px 34px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  background: var(--card-paper);
+  color: var(--card-ink);
+  border: var(--edge) solid var(--card-ink);
+  box-shadow: 12px 12px 0 var(--ink);
+  pointer-events: auto;
+  transition: transform 0.5s steps(6), opacity 0.5s steps(6), visibility 0s;
+}
+
+.card.away {
+  transform: translate(-30vw, 40vh) scale(0.2) rotate(-12deg);
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 0.5s steps(6), opacity 0.5s steps(6), visibility 0s 0.5s;
+}
+
+.card-close {
+  position: absolute;
+  top: -48px;
+  right: calc(-1 * var(--edge));
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: var(--paper);
+  border: var(--edge) solid var(--ink);
+}
+
+.card-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: square;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.card-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-weight: 700;
+  font-size: clamp(36px, 5vw, 60px);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.tagline {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 20px;
+  color: var(--card-soft);
+}
+
+.stamp {
+  flex: 0 0 auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.stamp img {
+  display: block;
+  width: 96px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  padding: 6px;
+  background: var(--card-paper);
+  box-shadow: 0 0 0 var(--edge) var(--card-ink), 6px 6px 0 var(--edge) var(--rose);
+  filter: contrast(1.2) saturate(0.8);
+}
+
+.stamp figcaption {
+  font-family: var(--pixel);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--card-soft);
+}
+
+.card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 24px 40px;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.message p {
+  margin: 0;
+}
+
+.links {
+  margin: 0;
+  padding: 0 0 0 28px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: var(--edge) solid var(--card-ink);
+  font-family: var(--pixel);
+  font-size: 20px;
+}
+
+.links li {
+  padding: 6px 0;
+}
+
+.links li::before {
+  content: '> ';
+}
+
+/* The small card that brings the big one back */
+.mini-card {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  min-height: 44px;
+  padding: 8px 14px 8px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--edge) solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+  font-size: 17px;
+  transform: rotate(-3deg);
+}
+
+.mini-card img {
+  display: block;
+  width: 36px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  filter: contrast(1.2) saturate(0.8);
+}
+
+/* Season, weather and hour */
+/* The instruments are painted on the canvas; these buttons are the invisible hands over them. */
+.controls button {
+  position: fixed;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+.controls button:focus-visible {
+  outline-offset: 2px;
+}
+
+.controls button::after {
+  content: attr(data-name);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 2px 8px;
+  background: var(--dusk);
+  color: var(--paper);
+  border: 2px solid var(--paper);
+  font-family: var(--pixel);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.controls button:hover::after,
+.controls button:focus::after {
+  visibility: visible;
+}
+
+[hidden] {
+  display: none;
+}
