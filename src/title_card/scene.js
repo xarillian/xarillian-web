@@ -8,6 +8,11 @@
 //                                       `moon` runs 0 new, 0.5 full, 1 new
 //   snap()                              keeps the last frame, so the next
 //                                       change dissolves in rather than cuts
+// We stand low on the bank: the bridge leaves our side large and lands small on the far one. These are fractions of
+// its reach across the scene: where its near end and vanishing point sit, how far below the horizon the nearest pier
+// stands (eye), and how tall the deck, truss and piers are up close.
+const BRIDGE = { near: -0.1, vanish: 1.02, end: 0.14, eye: 0.047, deck: 0.1, truss: 0.156, pier: 0.06, spans: 7 };
+
 export function createScene(w, h) {
   const B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
   const hex = (s) => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
@@ -36,7 +41,7 @@ export function createScene(w, h) {
     return a + (b - a) * u + (c - a) * v + (a - b - c + e) * u * v;
   };
   const SKY = {
-    night: ['#120f2a', '#1b1637', '#2a2050', '#45306a', '#7a4a7e', '#c06a78', '#f0a070'].map(hex),
+    night: ['#0e0c22', '#120f2a', '#1b1637', '#241b46', '#2f2356', '#3d2c64', '#4e3672'].map(hex),
     dawn: ['#2b2a5e', '#514680', '#8a5f93', '#c9778f', '#f09a7e', '#f8c387', '#fde3a6'].map(hex),
     day: ['#2f6fb7', '#3f86c9', '#58a0d6', '#7bb8e0', '#a3cfe8', '#c6e1ee', '#e3eff0'].map(hex),
     dusk: ['#1e1a4a', '#3a2a6c', '#6b3a80', '#a94a7a', '#de6a62', '#f29a56', '#f9cf7a'].map(hex),
@@ -103,12 +108,19 @@ export function createScene(w, h) {
   const STEEL = hex('#4b3a3a'),
     POLE = hex('#3a3038'),
     PALE = hex('#e9e2cf');
+  const ENGINE = hex('#b5452f');
   const CARS = ['#8a3b2e', '#3a4a5c', '#6b5a3a', '#2d2d38'].map(hex);
   const k = h / 250,
     u = Math.max(1, Math.round(k));
   const q = (v) => Math.max(1, Math.round(v * k));
   const F = new Uint8Array(w * h),
-    N = new Uint8Array(w * h);
+    S = new Uint8Array(w * h),
+    N = new Uint8Array(w * h),
+    footing = new Int16Array(w);
+  const CONCRETE = hex('#8f887c'),
+    SAND = hex('#a8946a'),
+    SNOWBANK = hex('#dfe7f0');
+  let rail = null;
   let HZ = 0,
     lamps = [],
     season = '',
@@ -119,6 +131,7 @@ export function createScene(w, h) {
   const build = (s) => {
     season = s;
     F.fill(0);
+    S.fill(0);
     lamps = [];
     N.fill(0);
     let seed = 11;
@@ -176,10 +189,18 @@ export function createScene(w, h) {
           put(L, x, y, dy < -r * 0.25 && hash(x, y) < 0.45 ? mh : m);
         }
     };
-    const fringe = (lo, hi) => {
+    // Our own bank: low in the middle, rising at either side, with sand at the water and the trees set back on the grass.
+    const bankTop = (x) => {
+      const left = Math.pow(clamp(1 - x / (w * 0.34), 0, 1), 1.5) * h * 0.14,
+        right = Math.pow(clamp((x - w * 0.7) / (w * 0.3), 0, 1), 1.5) * h * 0.11;
+      return h - q(3) - Math.round(left + right + noise((x * 0.02) / k, 8) * q(3));
+    };
+    const rooted = (x) => bankTop(x) + q(6 + hash(Math.round(x), 21) * 5);
+    const nearBank = () => {
       for (let x = 0; x < w; x++) {
-        const g = q(lo) + Math.floor(hash(x, 5) * q(hi)) + (hash(x, 9) > 0.92 ? q(5) : 0);
-        for (let y = h - g; y < h; y++) put(N, x, y, hash(x, y) < 0.18 ? 4 : 3);
+        const top = bankTop(x),
+          tuft = Math.floor(hash(x, 5) * q(3)) + (hash(x, 9) > 0.92 ? q(3) : 0);
+        for (let y = top; y < h; y++) put(N, x, y, y - top < q(2) - tuft || (winter && hash(x, y) > 0.1) ? 14 : hash(x, y) < 0.18 ? 4 : 3);
       }
     };
     const spruces = (ranges) => {
@@ -187,33 +208,101 @@ export function createScene(w, h) {
         for (let cx = from; cx < to; ) {
           const th = h * (0.34 + rnd() * 0.22),
             hw = th * 0.2;
-          spruce(N, cx, h + q(3), th, hw, 5, 6);
+          spruce(N, cx, rooted(clamp(cx, 0, w - 1)), th, hw, 5, 6);
           cx += hw * (0.9 + rnd() * 0.8);
         }
     };
-    HZ = Math.round(h * 0.64);
-    for (let x = 0; x < w; x++) {
-      const top = HZ - q(10) - Math.round(noise((x * 0.012) / k, 4) * q(16) + hash(x >> 1, 3) * q(4));
-      for (let y = top; y < HZ; y++) put(F, x, y, hash(x, y) < (y - top < q(3) ? 0.5 : 0.22) ? 2 : 1);
-    }
-    const deck = HZ - q(12),
-      bay = q(16),
-      rise = q(9);
-    for (let x = 0; x < w; x++) {
-      const a = (x % bay) / bay;
-      rect(F, x, deck, x, deck + u - 1, 7);
-      put(F, x, deck - rise, 7);
-      put(F, x, deck - Math.abs(a * 2 - 1) * rise, 7);
-      if (x % bay < u) rect(F, x, deck - rise, x, deck, 7);
-      if (x % (bay * 4) < 2 * u) rect(F, x, deck, x, HZ - 1, 7);
-      if (x % (bay * 4) === 0) {
-        rect(F, x, deck - rise - q(3), x, deck - rise, 9);
-        lamps.push([x, deck - rise - q(4)]);
+    // The far shore: a strip of sand, then birch and spruce mixed.
+    const farShore = () => {
+      const base = HZ - q(3);
+      for (let x = 0; x < w; x++) {
+        const top = base - q(7) - Math.round(noise((x * 0.012) / k, 4) * q(12) + hash(x >> 1, 3) * q(4));
+        for (let y = top; y < base; y++) put(F, x, y, hash(x, y) < (y - top < q(3) ? 0.5 : 0.22) ? 2 : 1);
+        if (hash(x, 31) < 0.1) rect(F, x, base - q(3 + hash(x, 33) * 4), x, base - 1, 16);
+        rect(F, x, base, x, HZ - 1, 15);
       }
-    }
+      for (let cx = rnd() * q(10); cx < w; cx += q(5 + rnd() * 22)) {
+        const th = q(13 + rnd() * 15);
+        spruce(F, cx, base, th, th * 0.24, 12, 13);
+      }
+    };
+    HZ = Math.round(h * 0.64);
+    farShore();
+    // The bridge leaves our bank near and large and lands on the far bank small; everything on it scales with distance.
+    const bridge = () => {
+      // One measure for width and height keeps the bridge's shape in any window; a very wide one just shows more far bank.
+      const reach = Math.min(w, h * 1.9),
+        fine = (v) => (v * reach) / 320,
+        from = BRIDGE.near * reach,
+        vanish = BRIDGE.vanish * reach,
+        run = vanish - from,
+        length = (1 / BRIDGE.end - 1) * run;
+      const scale = (d) => 1 / (1 + d / run);
+      const scaleAtColumn = (x) => clamp((vanish - x) / run, BRIDGE.end, 8);
+      const footAt = (sc) => HZ + (BRIDGE.eye * reach * (sc - BRIDGE.end)) / (1 - BRIDGE.end);
+      const deckAt = (sc) => HZ - BRIDGE.deck * reach * sc;
+      const xAt = (d) => vanish - run * scale(d);
+      rail = {
+        length,
+        run,
+        xAt,
+        scaleAtColumn,
+        deckAt,
+        land: Math.round(xAt(length)),
+        carHeight: BRIDGE.truss * reach * 0.5,
+        speed: fine(26),
+      };
+
+      const at = (d, lift) => [xAt(d), deckAt(scale(d)) - lift * BRIDGE.truss * reach * scale(d)];
+      const beam = ([x0, y0], [x1, y1], m, thick = 1) => {
+        const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) || 1;
+        for (let i = 0; i <= steps; i++)
+          for (let a = 0; a < thick; a++)
+            for (let b = 0; b < thick; b++) put(S, x0 + ((x1 - x0) * i) / steps + a, y0 + ((y1 - y0) * i) / steps + b, m);
+      };
+      const PANELS = 6,
+        span = length / BRIDGE.spans,
+        panel = span / PANELS,
+        crown = (p) => (p === 0 || p === PANELS ? 0 : 1);
+      // The truss on the far side of the track sits a little up and along from the near one.
+      const across = (point, d) => [point[0] + fine(7) * scale(d), point[1] - fine(2.5) * scale(d)];
+      const truss = (place, m, heavy) => {
+        for (let i = 0; i < BRIDGE.spans; i++)
+          for (let p = 0; p < PANELS; p++) {
+            const d = i * span + p * panel,
+              chord = Math.max(1, Math.round(fine(heavy) * scale(d))),
+              web = Math.max(1, Math.round(fine(heavy * 0.6) * scale(d))),
+              falls = p < PANELS / 2;
+            beam(place(d, 0), place(d + panel, 0), m, chord + 1);
+            beam(place(d, crown(p)), place(d + panel, crown(p + 1)), m, chord);
+            if (crown(p)) beam(place(d, 0), place(d, 1), m, web);
+            if (p > 0 && p < PANELS - 1) beam(place(d, falls ? 1 : 0), place(d + panel, falls ? 0 : 1), m, web);
+          }
+      };
+      const piers = () => {
+        for (let i = 0; i <= BRIDGE.spans; i++) {
+          const sc = scale(i * span),
+            [px] = at(i * span, 0),
+            half = Math.max(0.5, BRIDGE.pier * reach * sc * 0.5),
+            cap = Math.round(deckAt(sc)) + Math.max(1, Math.round(fine(3) * sc));
+          for (let x = Math.round(px - half * 1.25); x <= Math.round(px + half * 1.25 + fine(7) * sc); x++)
+            for (let y = Math.round(deckAt(sc)); y < footAt(sc); y++)
+              if (y < cap || (x >= px - half && x <= px + half + fine(5) * sc)) put(S, x, y, hash(x, y) < 0.2 ? 9 : 11);
+          if (i < BRIDGE.spans && i % 2 === 0) lamps.push(at(i * span + span / 2, 1.12).map(Math.round));
+        }
+      };
+      truss((d, lift) => across(at(d, lift), d), 17, 2.2);
+      for (let i = 0; i < BRIDGE.spans; i++)
+        for (let p = 1; p < PANELS; p++) beam(at(i * span + p * panel, 1), across(at(i * span + p * panel, 1), i * span + p * panel), 17);
+      piers();
+      truss(at, 7, 3.4);
+      for (let x = 0; x < w; x++) footing[x] = Math.round(footAt(scaleAtColumn(x)));
+    };
+    bridge();
+    nearBank();
     for (const bx of [0.03, 0.085, 0.135]) {
       const x0 = Math.round(w * bx);
-      for (let y = Math.round(h * 0.2); y < h; y++)
+      for (let y = Math.round(h * 0.2); y < rooted(x0); y++)
         for (let a = 0; a < q(y > h * 0.6 ? 3 : 2); a++) put(N, x0 + a, y, hash(x0 + a, y >> 1) < 0.16 ? 9 : 10);
       buds.length = 0;
       for (let i = 0; i < 12; i++)
@@ -221,7 +310,82 @@ export function createScene(w, h) {
       for (const [x, y] of buds) blob(N, x, y, q(2.5 + hash(x | 0, y | 0) * 2.5), 3, 4);
     }
     spruces([[w * 0.9, w + 6]]);
-    fringe(2, 4);
+  };
+
+  // What a car shows at a point along it (0 rear, 1 front) and up it (0 rail, 1 roof): a part to paint, or nothing.
+  const CAR_PART = {
+    engine: (along, up) => {
+      const roof = along > 0.9 ? 0.62 : along > 0.68 ? 1.08 : 0.82;
+      if (up > roof) return null;
+      if (along > 0.72 && along < 0.86 && up > 0.78 && up < 0.98) return 'glass';
+      if (up > 0.3 && up < 0.42) return 'trim';
+      return up > roof - 0.08 ? 'roof' : 'body';
+    },
+    boxcar: (along, up) => (up > 0.95 ? null : up > 0.87 ? 'roof' : Math.abs(along - 0.5) < 0.09 ? 'shade' : 'body'),
+    tanker: (along, up) => {
+      const end = Math.min(along, 1 - along),
+        round = end < 0.1 ? (0.1 - end) * 2.6 : 0;
+      if (Math.abs(along - 0.5) < 0.05 && up > 0.84 && up < 1) return 'shade';
+      if (up > 0.86 - round || up < 0.26 + round) return up < 0.26 && up > 0.2 ? 'frame' : null;
+      return up > 0.72 ? 'roof' : Math.abs(up - 0.5) < 0.06 ? 'trim' : 'body';
+    },
+    hopper: (along, up) => {
+      const end = Math.min(along, 1 - along);
+      if (up > 0.92 || up < 0.2 + Math.max(0, 0.18 - end) * 2.2) return null;
+      return up > 0.84 ? 'roof' : Math.round(along * 16) % 2 ? 'body' : 'shade';
+    },
+    flatcar: (along, up) => {
+      if (up < 0.27) return 'frame';
+      if (up > 0.86 || Math.abs(along - 0.5) < 0.03 || along < 0.04 || along > 0.96) return null;
+      return up > 0.8 ? 'roof' : along < 0.5 ? 'body' : 'second';
+    },
+  };
+  const CONSIST = ['engine', 'boxcar', 'tanker', 'hopper', 'flatcar', 'boxcar', 'hopper', 'tanker', 'flatcar', 'boxcar'];
+
+  // The train runs inside the truss, so the near steel passes in front of it.
+  const drawTrain = (t, plot, lit, frame, dark) => {
+    const tall = rail.carHeight,
+      long = tall * 3.4,
+      pitch = long + tall * 0.4,
+      route = rail.length + rail.run * 0.9 + pitch * CONSIST.length,
+      head = ((t * rail.speed) % route) - rail.run * 0.9;
+    const paint = (x, y, c) => {
+      if (x >= 0 && x < w && y >= 0 && !N[y * w + x] && S[y * w + x] !== 7) plot(x, y, c);
+    };
+    CONSIST.forEach((kind, i) => {
+      const front = head - i * pitch;
+      if (front - pitch <= -rail.run * 0.95) return;
+      const body = lit(i ? CARS[i % CARS.length] : ENGINE),
+        colour = {
+          body,
+          frame,
+          glass: dark ? LAMP : lit(PALE),
+          shade: mix(body, frame, 0.35),
+          roof: mix(body, WHITE, 0.22),
+          trim: lit(PALE),
+          second: lit(CARS[(i + 2) % CARS.length]),
+        },
+        from = Math.round(rail.xAt(front - long)),
+        to = Math.round(rail.xAt(front));
+      for (let x = Math.round(rail.xAt(front - pitch)); x <= Math.min(to, rail.land); x++) {
+        const sc = rail.scaleAtColumn(x),
+          deck = Math.round(rail.deckAt(sc)),
+          rise = Math.max(2, Math.round(tall * sc)),
+          along = (x - from) / Math.max(1, to - from);
+        if (x < from) {
+          paint(x, deck - Math.max(1, Math.round(rise * 0.22)), frame);
+          continue;
+        }
+        const truck = Math.abs(along - 0.16) < 0.1 || Math.abs(along - 0.84) < 0.1;
+        for (let r = 0; r < Math.ceil(rise * 1.1); r++) {
+          const up = (r + 0.5) / rise,
+            part = up < 0.2 ? (truck || up > 0.12 || rise < 5 ? 'frame' : null) : CAR_PART[kind](along, up);
+          if (part) paint(x, deck - 1 - r, colour[part]);
+        }
+      }
+      if (!i && dark && to < rail.land)
+        paint(to + 1, Math.round(rail.deckAt(rail.scaleAtColumn(to)) - tall * rail.scaleAtColumn(to) * 0.45), LAMP);
+    });
   };
 
   const draw = (d, t, { hour, weather, moon, pokes }) => {
@@ -250,6 +414,7 @@ export function createScene(w, h) {
     const rime = (c) => (wx.frost ? mix(c, RIME, wx.frost) : c);
     const glint = (x, y) => wx.glaze && hash(x, y) > 0.93 && Math.sin(t * 2.2 + x * 1.3 + y * 0.7) > 0.2;
     const dark = light < 0.3;
+    const sand = season === 'winter' ? SNOWBANK : SAND;
     const M = [
       null,
       hazy(rime(se.far)),
@@ -262,6 +427,13 @@ export function createScene(w, h) {
       lit(rime(TWIG)),
       lit(POLE),
       lit(PALE),
+      lit(CONCRETE),
+      hazy(rime(se.ever)),
+      hazy(rime(se.everHi)),
+      lit(rime(sand)),
+      hazy(rime(sand)),
+      hazy(PALE),
+      mix(lit(STEEL), sky[n - 1], 0.3),
     ];
     const deep = mix(mix(hex('#151b33'), hex('#2a5c8f'), light), grey, wx.over * 0.5);
     const ice = mix(hex('#3a4468'), hex('#dfe7f0'), light);
@@ -377,24 +549,24 @@ export function createScene(w, h) {
         let col,
           m = N[y * w + x];
         if (m) col = fog && th < fog * 0.33 ? fogCol : glint(x, y) ? WHITE : M[m];
+        else if ((m = S[y * w + x])) col = fog && th < fog * 0.5 ? fogCol : M[m];
         else if (y < HZ) {
           m = F[y * w + x];
           col = m ? (fog && th < fog * 0.7 ? fogCol : M[m]) : skyAt(x, y);
         } else if (y === HZ) col = fog && th < fog * 0.7 ? fogCol : shore;
         else {
           const depth = (y - HZ) / Math.max(1, h - HZ),
-            ry = Math.max(0, HZ - (y - HZ) - 1);
+            ry = Math.max(0, HZ - (y - HZ) - 1),
+            sx = frozen
+              ? x
+              : clamp(x + Math.round(Math.sin((y * 0.9) / k + t * 0.3) * (0.7 + depth * 1.8) * (1 + (wx.rain || 0) * 0.6) * k), 0, w - 1);
+          // The angled bridge mirrors about its own piers' feet, not the far shore.
+          const under = 2 * footing[sx] - y - 1;
+          m = (under >= 0 && S[under * w + sx]) || F[ry * w + sx];
           if (frozen) {
-            m = F[ry * w + x];
-            col = th < 0.62 + depth * 0.25 ? ice : m ? M[m] : skyAt(x, ry);
+            col = th < 0.62 + depth * 0.25 ? ice : skyAt(x, ry);
             if (hash(x >> 1, y) < 0.06) col = M[4];
           } else {
-            const sx = clamp(
-              x + Math.round(Math.sin((y * 0.9) / k + t * 0.3) * (0.7 + depth * 1.8) * (1 + (wx.rain || 0) * 0.6) * k),
-              0,
-              w - 1,
-            );
-            m = F[ry * w + sx];
             col = m ? M[m] : skyAt(sx, ry);
             if (th < 0.3 + depth * 0.35) col = deep;
           }
@@ -438,22 +610,7 @@ export function createScene(w, h) {
         dot(cx - u, cy - 2 * u, M[9]);
         dot(cx + u, cy - u, M[9]);
       }
-      {
-        const rail = HZ - q(12),
-          head = Math.round((t * 7 * k + w * 0.9) % (w * 1.9));
-        for (let i = 0; i < 10; i++) {
-          const x0 = head - i * 8 * u,
-            len = i ? 7 : 9,
-            c = lit(CARS[i % 4]);
-          if (x0 < -10 * u || x0 > w + 10 * u) continue;
-          for (let a = 0; a < len; a++) for (let b = 1; b <= 3; b++) dot(x0 - a * u, rail - b * u, c);
-          if (!i) {
-            dot(x0 - 6 * u, rail - 4 * u, c);
-            dot(x0 - 7 * u, rail - 4 * u, c);
-            if (dark) dot(x0 + u, rail - 2 * u, LAMP);
-          }
-        }
-      }
+      drawTrain(t, plot, lit, mix(lit(STEEL), ink, 0.5), dark);
       if ((season === 'spring' || season === 'autumn') && light > 0.3) {
         const gx = w + 20 * u - ((t * 6 * k + w * 0.75) % (w + 160 * u)),
           gy = HZ * 0.3 + Math.sin(t * 0.3) * 4 * u;
