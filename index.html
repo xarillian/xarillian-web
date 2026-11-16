@@ -4,60 +4,63 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Austin Wayne</title>
+<meta name="description" content="TODO">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://xarillian.com/">
+<meta property="og:site_name" content="xarillian">
+<meta property="og:title" content="Austin Wayne">
+<meta property="og:description" content="TODO">
+<meta property="og:image" content="https://xarillian.com/images/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A pixel-art railway bridge over a river at dusk, a business card in front.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://xarillian.com/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&amp;family=IBM+Plex+Sans:wght@400;500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&amp;family=IBM+Plex+Sans&amp;display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="stylesheet" href="styles.css">
 <script type="module" src="src/title_card/landing.js"></script>
 </head>
 <body>
-<canvas id="scene" aria-hidden="true"></canvas>
-<main>
-  <article class="card">
-    <button class="card-close" type="button" aria-label="Put the card away" hidden>
-      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2L10 10M10 2L2 10"/></svg>
-    </button>
-    <!-- THE CARD: everything you fill in lives between here and "end of the card". -->
-    <header class="card-head">
-      <div class="card-title">
-        <h1>Austin Wayne</h1>
-        <!-- One line under the name. -->
-        <p class="tagline">Lorem ipsum dolor sit amet</p>
-      </div>
-      <figure class="stamp">
-        <img src="images/austin.webp" alt="">
-        <!-- A few characters under the photo, like a postmark. -->
-        <figcaption>LOREM 8</figcaption>
-      </figure>
-    </header>
-    <div class="card-body">
-      <!-- The message: one <p> per paragraph; two short ones fit best. -->
-      <div class="message">
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-      </div>
-      <!-- The links: one <li> each, plain words outside the <a>, the linked words inside, the address in href. -->
-      <ul class="links">
-        <li>Lorem <a href="#">ipsum dolor</a></li>
-        <li>or <a href="#">sit amet</a></li>
-        <li>Consectetur <a href="#">adipiscing</a></li>
-        <li>Sed do <a href="#">eiusmod</a></li>
-        <li>or <a href="#">tempor incididunt</a></li>
-      </ul>
-    </div>
-    <!-- end of the card -->
-  </article>
+<canvas id="river" aria-hidden="true"></canvas>
+<main class="plaque">
+  <button class="fold" type="button" aria-label="Collapse card" hidden>
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2h2v1H3zM4 3h2v1H4zM5 4h2v1H5zM6 5h2v2H6zM5 7h2v1H5zM4 8h2v1H4zM3 9h2v1H3z"/></svg>
+  </button>
+  <header>
+    <img src="images/austin.webp" alt="">
+    <h1>Austin Wayne</h1>
+    <p>Lorem ipsum dolor sit amet</p>
+  </header>
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+  <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+  <ul>
+    <li><img src="images/icons/github.svg" alt=""><a href="https://github.com/xarillian" target="_blank" rel="noopener">GitHub</a></li>
+    <li><img src="images/icons/substack.svg" alt=""><a href="https://substack.com/@xarillian" target="_blank" rel="noopener">Substack</a></li>
+    <li><img src="images/icons/linkedin.svg" alt=""><a href="https://www.linkedin.com/in/austin-heinrich/" target="_blank" rel="noopener">LinkedIn</a></li>
+    <li><img src="images/icons/email.svg" alt=""><a href="mailto:austinwheinrich@gmail.com" target="_blank" rel="noopener">Email Me</a></li>
+    <li><img src="images/icons/chevron.svg" alt="">Lorem <a href="#" target="_blank" rel="noopener">ipsum dolor</a></li>
+    <li><img src="images/icons/chevron.svg" alt="">Sed do <a href="#" target="_blank" rel="noopener">eiusmod</a></li>
+  </ul>
 </main>
-<button class="mini-card" type="button" aria-label="Show the card again" hidden>
-  <img src="images/austin.webp" alt="">
-  <span>Austin Wayne</span>
-</button>
-<nav class="controls" aria-label="Picture" hidden>
+<nav class="rail" aria-label="Links" hidden>
+  <button class="unfold" type="button" aria-label="Expand card">
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M7 2h2v1H7zM6 3h2v1H6zM5 4h2v1H5zM4 5h2v2H4zM5 7h2v1H5zM6 8h2v1H6zM7 9h2v1H7z"/></svg>
+  </button>
+</nav>
+<p class="corner"><a href="?debug">debug</a> · thanks <a href="https://open-meteo.com/" target="_blank" rel="noopener">open-meteo</a>!</p>
+<aside class="almanac" aria-label="Sky conditions" hidden>
   <button id="season" type="button"></button>
   <button id="weather" type="button"></button>
+  <p class="weather-credit"><a href="https://open-meteo.com/" target="_blank" rel="noopener">open-meteo</a>!</p>
   <button id="time" type="button"></button>
-</nav>
+  <button id="moon" type="button"></button>
+  <button id="squatch" type="button"></button>
+  <button id="fish" type="button"></button>
+  <button id="train" type="button"></button>
+</aside>
 </body>
 </html>

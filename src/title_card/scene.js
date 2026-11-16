@@ -1,19 +1,20 @@
-// The river, painted one fat pixel at a time. Nothing here is an image: the
-// bank, the bridge and the trees are stamped into two layers once per season,
-// and every frame the sky, the weather and the water are worked out again for
-// each pixel, so the same view can sit under any hour and any weather.
-//
-//   build(season)                       lays out the land for a season
-//   draw(pixels, seconds, conditions)   paints one frame into RGBA pixels;
-//                                       `moon` runs 0 new, 0.5 full, 1 new
-//   snap()                              keeps the last frame, so the next
-//                                       change dissolves in rather than cuts
-// We stand low on the bank: the bridge leaves our side large and lands small on the far one. These are fractions of
-// its reach across the scene: where its near end and vanishing point sit, how far below the horizon the nearest pier
-// stands (eye), and how tall the deck, truss and piers are up close.
-const BRIDGE = { near: -0.1, vanish: 1.02, end: 0.14, eye: 0.047, deck: 0.1, truss: 0.156, pier: 0.06, spans: 7 };
+import { SCENE_DAY_HOURS, SCENE_SUNRISE } from './almanac.js';
+
+const SCENE_SUNSET = SCENE_SUNRISE + SCENE_DAY_HOURS;
+const SQUATCH = Math.random() < 0.01;
+const SQUATCH_FRAMES = [
+  ['..XX.', '.XXX.', 'XXXX.', '.XXXX', '.XXX.', '.X.X.', 'X...X'],
+  ['..XX.', '.XXX.', '.XXX.', '.XXX.', '.XX..', '.XX..', '.X.X.'],
+];
+
+// Bridge geometry as fractions of `reach`: near-bank start (`near`), perspective vanishing point (`vanish`),
+// foreshortened scale at the far shore (`end`), pier depth below the horizon at the near bank (`eye`),
+// heights of deck, truss, and pier width (`deck`, `truss`, `pier`), span count, and far-truss scale factor (`across`).
+const BRIDGE = { near: -0.1, vanish: 1.02, end: 0.14, eye: 0.047, deck: 0.1, truss: 0.156, pier: 0.06, spans: 7, across: 0.94 };
 
 export function createScene(w, h) {
+  // 4x4 Bayer ordered-dithering matrix (0..15). Comparing a [0, 1] value against `dither(x, y)` produces
+  // deterministic pixel-art stippling without alpha blending.
   const B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
   const hex = (s) => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
   const mix = (a, b, f) => [
@@ -22,11 +23,14 @@ export function createScene(w, h) {
     Math.round(a[2] + (b[2] - a[2]) * f),
   ];
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  // Deterministic 2D integer hash returning [0, 1) via prime multiplication and XOR-shift avalanche.
   const hash = (x, y) => {
     let n = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
     n = Math.imul(n ^ (n >>> 13), 1274126177);
     return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
   };
+  const dither = (x, y) => B[(y & 3) * 4 + (x & 3)] / 16;
+  // 2D value noise: bilinearly interpolates `hash` across integer grid corners using smoothstep (3t^2 - 2t^3).
   const noise = (x, y) => {
     const xi = Math.floor(x),
       yi = Math.floor(y),
@@ -88,6 +92,21 @@ export function createScene(w, h) {
     'funnel cloud': { cover: 1, over: 0.88, grey: ['#0f1410', '#3d4a44'], rain: 0.5, funnel: true },
     noctilucent: { cover: 0.05, over: 0, wisps: true },
   };
+  for (const kind of Object.values(WX)) if (kind.grey) kind.grey = kind.grey.map(hex);
+  const COLD_WX = { clear: { cover: 0, over: 0 } };
+  // `pace` scales the aurora animation clock; `wobble` scales the vertical wave amplitude of the curtain's lower edge.
+  const AURORA = { pace: 0.3, wobble: 0.35 };
+  // Fog opacity multipliers by depth layer so foreground elements cut through fog more clearly than distant ones.
+  const FOG = { near: 0.33, bridge: 0.5, water: 0.6, far: 0.7 };
+  // Jump interval (30s) and airborne duration (0.9s). Two sturgeon entries to one pike and one walleye give a 2:1:1 ratio.
+  const LEAP_EVERY = 30,
+    LEAP = 0.9;
+  const FISH = [
+    { back: '#4f4a40', belly: '#b3a78e', length: 10 },
+    { back: '#4f4a40', belly: '#b3a78e', length: 10 },
+    { back: '#3d5634', belly: '#cfd9a2', length: 8 },
+    { back: '#6e6a2c', belly: '#e6d48c', length: 6 },
+  ].map((f) => ({ ...f, back: hex(f.back), belly: hex(f.belly) }));
   const BOW = ['#7a5bd6', '#3fa7e0', '#4fd08a', '#f2d04a', '#ef6a4a'].map(hex),
     DOG = hex('#ffd9a0'),
     EMBER = hex('#e8452c'),
@@ -104,19 +123,34 @@ export function createScene(w, h) {
     AUR_TEAL = hex('#3fc7d4'),
     AUR_CROWN = hex('#d6508a'),
     AUR_HEM = hex('#8a6cf0'),
-    LAMP = hex('#ffd36b');
+    LAMP = hex('#ffd36b'),
+    FIREFLY = hex('#e8f59a'),
+    FLAKE = hex('#eef3f8'),
+    RED_LEAF = hex('#b9452a');
+  // [dark, light] colour endpoints blended by `light` (or by solar altitude for `SUN`).
+  const GREY = ['#1c2030', '#8f99a8'].map(hex),
+    DEEP = ['#151b33', '#2a5c8f'].map(hex),
+    ICE = ['#3a4468', '#dfe7f0'].map(hex),
+    SUN = ['#fff3c4', '#ff9a4a'].map(hex);
   const STEEL = hex('#4b3a3a'),
     POLE = hex('#3a3038'),
     PALE = hex('#e9e2cf');
   const ENGINE = hex('#b5452f');
   const CARS = ['#8a3b2e', '#3a4a5c', '#6b5a3a', '#2d2d38'].map(hex);
-  const k = h / 250,
-    u = Math.max(1, Math.round(k));
-  const q = (v) => Math.max(1, Math.round(v * k));
+  const SASQUATCH = hex('#2b1d16');
+  // Sizes are authored against a 250px reference height; `q(v)` scales a measurement to at least 1 scene pixel.
+  const k = h / 250;
+  const q = (v) => Math.max(1, Math.round(v * k)),
+    u = q(1);
+  // Static seasonal layers holding palette indices into `M`: `F` (far bank), `S` (bridge steel/piers), `N` (near bank/trees).
+  // `footing[x]` records the waterline y-coordinate of the bridge pier at column `x` for water reflections.
   const F = new Uint8Array(w * h),
     S = new Uint8Array(w * h),
     N = new Uint8Array(w * h),
     footing = new Int16Array(w);
+  // Per-frame layer holding colour indices into `inks` for the moving train so water reflections can sample it with `S`.
+  const carriage = new Uint8Array(w * h);
+  let inks = [null];
   const CONCRETE = hex('#8f887c'),
     SAND = hex('#a8946a'),
     SNOWBANK = hex('#dfe7f0');
@@ -135,6 +169,7 @@ export function createScene(w, h) {
     lamps = [];
     N.fill(0);
     let seed = 11;
+    // Lehmer RNG (Park-Miller, multiplier 7^5 mod 2^31 - 1) for repeatable far-shore spruce placement.
     const rnd = () => {
       seed = (seed * 16807) % 2147483647;
       return seed / 2147483647;
@@ -148,6 +183,8 @@ export function createScene(w, h) {
     const rect = (L, x0, y0, x1, y1, m) => {
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(L, x, y, m);
     };
+    // Draws a conifer from apex (r = 0) to base (r = th). `(r % 7) / 6` modulates the cone width `hw * (r / th)`
+    // into 7-row serrated branch tiers; pixels protruding past the row above (`Math.abs(dx) > last - 1`) take highlight `mh`.
     const spruce = (L, cx, base, th, hw, m, mh) => {
       let last = 0;
       for (let r = 0; r <= th; r++) {
@@ -161,7 +198,6 @@ export function createScene(w, h) {
         last = wr;
       }
     };
-    // A birch keeps one skeleton all year; a season only decides how much leaf hangs on it.
     const leafy = { winter: 0, autumn: 0.4, spring: 0.6 }[s] ?? 0.85;
     const buds = [];
     const twig = (x, y, dx, dy, len) => {
@@ -178,6 +214,7 @@ export function createScene(w, h) {
       }
       buds.push([x + lean * len, y - len]);
     };
+    // Draws an oblate foliage cluster (`dy^2 * 1.4` flattens the ellipse vertically) thinned by seasonal density `leafy`.
     const blob = (L, cx, cy, r, m, mh) => {
       const R = Math.ceil(r);
       for (let dy = -R; dy <= R; dy++)
@@ -189,12 +226,13 @@ export function createScene(w, h) {
           put(L, x, y, dy < -r * 0.25 && hash(x, y) < 0.45 ? mh : m);
         }
     };
-    // Our own bank: low in the middle, rising at either side, with sand at the water and the trees set back on the grass.
+    // Raises the foreground bank at the left (x < 0.34w) and right (x > 0.7w) margins via a 1.5 power curve.
     const bankTop = (x) => {
       const left = Math.pow(clamp(1 - x / (w * 0.34), 0, 1), 1.5) * h * 0.14,
         right = Math.pow(clamp((x - w * 0.7) / (w * 0.3), 0, 1), 1.5) * h * 0.11;
       return h - q(3) - Math.round(left + right + noise((x * 0.02) / k, 8) * q(3));
     };
+    // Sets tree roots 6..11 units below `bankTop` so trunks do not sprout directly from the water's edge.
     const rooted = (x) => bankTop(x) + q(6 + hash(Math.round(x), 21) * 5);
     const nearBank = () => {
       for (let x = 0; x < w; x++) {
@@ -203,16 +241,19 @@ export function createScene(w, h) {
         for (let y = top; y < h; y++) put(N, x, y, y - top < q(2) - tuft || (winter && hash(x, y) > 0.1) ? 14 : hash(x, y) < 0.18 ? 4 : 3);
       }
     };
-    const spruces = (ranges) => {
-      for (const [from, to] of ranges)
-        for (let cx = from; cx < to; ) {
-          const th = h * (0.34 + rnd() * 0.22),
-            hw = th * 0.2;
-          spruce(N, cx, rooted(clamp(cx, 0, w - 1)), th, hw, 5, 6);
-          cx += hw * (0.9 + rnd() * 0.8);
-        }
+    const grove = () => {
+      const cx = w - q(26),
+        th = h * 0.5,
+        hw = th * 0.2;
+      spruce(N, cx, rooted(cx), th, hw, 5, 6);
+      for (const [side, size] of [
+        [-1, 0.62],
+        [1, 0.5],
+      ]) {
+        const x = cx + side * hw * 0.62;
+        spruce(N, x, rooted(clamp(x, 0, w - 1)) + q(5), th * size, hw * size, 5, 6);
+      }
     };
-    // The far shore: a strip of sand, then birch and spruce mixed.
     const farShore = () => {
       const base = HZ - q(3);
       for (let x = 0; x < w; x++) {
@@ -228,9 +269,12 @@ export function createScene(w, h) {
     };
     HZ = Math.round(h * 0.64);
     farShore();
-    // The bridge leaves our bank near and large and lands on the far bank small; everything on it scales with distance.
     const bridge = () => {
-      // One measure for width and height keeps the bridge's shape in any window; a very wide one just shows more far bank.
+      // Clamping `reach` to `min(w, 1.9h)` preserves the bridge's aspect ratio on ultrawide and portrait screens alike.
+      // Perspective math: for distance `d` along the bridge toward `vanish`, foreshortened scale is `sc = 1 / (1 + d / run)`
+      // and screen x is `vanish - run * sc`. Solving `scale(length) = BRIDGE.end` gives total track length `(1 / end - 1) * run`.
+      // `footAt(sc)` interpolates pier bases linearly in scale from `HZ + eye * reach` (at sc = 1) to `HZ` (at sc = end)
+      // so the last pier lands cleanly on the far shoreline.
       const reach = Math.min(w, h * 1.9),
         fine = (v) => (v * reach) / 320,
         from = BRIDGE.near * reach,
@@ -264,8 +308,14 @@ export function createScene(w, h) {
         span = length / BRIDGE.spans,
         panel = span / PANELS,
         crown = (p) => (p === 0 || p === PANELS ? 0 : 1);
-      // The truss on the far side of the track sits a little up and along from the near one.
-      const across = (point, d) => [point[0] + fine(7) * scale(d), point[1] - fine(2.5) * scale(d)];
+      // Projects the far-side truss at `BRIDGE.across` (0.94) of the near truss's scale and shifts it right by 7 units
+      // so the far steel sits lower and closer to the horizon, matching a camera below deck height.
+      const across = (d, lift) => {
+        const sc = scale(d) * BRIDGE.across;
+        return [xAt(d) + fine(7) * scale(d), deckAt(sc) - lift * BRIDGE.truss * reach * sc];
+      };
+      // Each span has 6 panels. `crown(p)` drops the top chord to the deck at panel 0 and 6 to form sloped end posts,
+      // while interior diagonals alternate downward (`falls`) in the first half of the span and upward in the second.
       const truss = (place, m, heavy) => {
         for (let i = 0; i < BRIDGE.spans; i++)
           for (let p = 0; p < PANELS; p++) {
@@ -291,28 +341,36 @@ export function createScene(w, h) {
           if (i < BRIDGE.spans && i % 2 === 0) lamps.push(at(i * span + span / 2, 1.12).map(Math.round));
         }
       };
-      truss((d, lift) => across(at(d, lift), d), 17, 2.2);
+      truss(across, 17, 2.2);
       for (let i = 0; i < BRIDGE.spans; i++)
-        for (let p = 1; p < PANELS; p++) beam(at(i * span + p * panel, 1), across(at(i * span + p * panel, 1), i * span + p * panel), 17);
+        for (let p = 1; p < PANELS; p++) beam(at(i * span + p * panel, 1), across(i * span + p * panel, 1), 17);
       piers();
       truss(at, 7, 3.4);
       for (let x = 0; x < w; x++) footing[x] = Math.round(footAt(scaleAtColumn(x)));
     };
     bridge();
-    nearBank();
-    for (const bx of [0.03, 0.085, 0.135]) {
-      const x0 = Math.round(w * bx);
-      for (let y = Math.round(h * 0.2); y < rooted(x0); y++)
+    // `forward` (0..1) shifts a birch's base from `rooted(x0)` toward the bottom of the canvas for foreground depth.
+    // Bough lengths follow `sin(pi * (i + 1) / 13)` so the middle of the crown spreads widest and tapers at top and bottom.
+    const birch = (at, tall, forward = 0) => {
+      const x0 = Math.round(w * at),
+        size = tall / 0.7,
+        foot = rooted(x0) + (h - rooted(x0)) * forward,
+        top = foot / h - tall;
+      for (let y = Math.round(h * top); y < foot; y++)
         for (let a = 0; a < q(y > h * 0.6 ? 3 : 2); a++) put(N, x0 + a, y, hash(x0 + a, y >> 1) < 0.16 ? 9 : 10);
       buds.length = 0;
       for (let i = 0; i < 12; i++)
-        bough(x0, h * (0.22 + 0.033 * i), i & 1 ? 1 : -1, q(14 + 20 * Math.sin((Math.PI * (i + 1)) / 13)), x0 + i);
+        bough(x0, h * (top + (0.02 + 0.033 * i) * size), i & 1 ? 1 : -1, q((14 + 20 * Math.sin((Math.PI * (i + 1)) / 13)) * size), x0 + i);
       for (const [x, y] of buds) blob(N, x, y, q(2.5 + hash(x | 0, y | 0) * 2.5), 3, 4);
-    }
-    spruces([[w * 0.9, w + 6]]);
+    };
+    nearBank();
+    for (const at of [0.03, 0.085, 0.135]) birch(at, 0.7);
+    birch(0.058, 0.5, 0.75);
+    birch(0.175, 0.42, 0.8);
+    grove();
   };
 
-  // What a car shows at a point along it (0 rear, 1 front) and up it (0 rail, 1 roof): a part to paint, or nothing.
+  // Maps normalized car coordinates `along` (0 rear .. 1 front) and `up` (0 rail .. 1 roof) to a palette key or null.
   const CAR_PART = {
     engine: (along, up) => {
       const roof = along > 0.9 ? 0.62 : along > 0.68 ? 1.08 : 0.82;
@@ -340,81 +398,96 @@ export function createScene(w, h) {
       return up > 0.8 ? 'roof' : along < 0.5 ? 'body' : 'second';
     },
   };
-  const CONSIST = ['engine', 'boxcar', 'tanker', 'hopper', 'flatcar', 'boxcar', 'hopper', 'tanker', 'flatcar', 'boxcar'];
+  const CONSIST = ['engine', 'boxcar', 'tanker', 'hopper', 'flatcar', 'boxcar'];
 
-  // The train runs inside the truss, so the near steel passes in front of it.
-  const drawTrain = (t, plot, lit, frame, dark) => {
+  // The scheduled train is a single consist on a closed loop of length `route`, so it can never collide with another
+  // scheduled train. Manual debug spawns (`trains`, `fishes`, `squatches`) start on click and are intentionally allowed
+  // to overlap each other or scheduled events.
+  const drawTrain = (t, lit, frame, dark, trains = []) => {
     const tall = rail.carHeight,
       long = tall * 3.4,
       pitch = long + tall * 0.4,
       route = rail.length + rail.run * 0.9 + pitch * CONSIST.length,
-      head = ((t * rail.speed) % route) - rail.run * 0.9;
-    const paint = (x, y, c) => {
-      if (x >= 0 && x < w && y >= 0 && !N[y * w + x] && S[y * w + x] !== 7) plot(x, y, c);
+      scheduled = ((t * rail.speed) % route) - rail.run * 0.9,
+      heads = [scheduled, ...trains.map((born) => (t - born) * rail.speed).filter((h) => h - pitch * CONSIST.length <= rail.length)],
+      // Deck slope (dy/dx) in pixels per screen column so each car's base follows the angled bridge deck.
+      lean = rail.deckAt(0) - rail.deckAt(1 / rail.run);
+    const paint = (x, y, ink) => {
+      if (x >= 0 && x < w && y >= 0 && y < h) carriage[y * w + x] = ink;
     };
-    CONSIST.forEach((kind, i) => {
-      const front = head - i * pitch;
-      if (front - pitch <= -rail.run * 0.95) return;
-      const body = lit(i ? CARS[i % CARS.length] : ENGINE),
-        colour = {
-          body,
-          frame,
-          glass: dark ? LAMP : lit(PALE),
-          shade: mix(body, frame, 0.35),
-          roof: mix(body, WHITE, 0.22),
-          trim: lit(PALE),
-          second: lit(CARS[(i + 2) % CARS.length]),
-        },
-        from = Math.round(rail.xAt(front - long)),
-        to = Math.round(rail.xAt(front));
-      for (let x = Math.round(rail.xAt(front - pitch)); x <= Math.min(to, rail.land); x++) {
-        const sc = rail.scaleAtColumn(x),
+    const lamp = inks.push(LAMP) - 1;
+    for (const head of heads) {
+      CONSIST.forEach((kind, i) => {
+        const front = head - i * pitch;
+        if (front - pitch <= -rail.run * 0.95) return;
+        const body = lit(i ? CARS[i % CARS.length] : ENGINE),
+          colour = {
+            body,
+            frame,
+            glass: dark ? LAMP : lit(PALE),
+            shade: mix(body, frame, 0.35),
+            roof: mix(body, WHITE, 0.22),
+            trim: lit(PALE),
+            second: lit(CARS[(i + 2) % CARS.length]),
+          };
+        for (const part in colour) colour[part] = inks.push(colour[part]) - 1;
+        // Anchor each car at its integer nose column `to` and step backward (`c <= 0`) using linear deck slope `c * lean`
+        // and height taper `(c * tall) / rail.run` so the car translates rigidly without per-column rounding ripple.
+        const to = Math.round(rail.xAt(front)),
+          sc = rail.scaleAtColumn(to),
           deck = Math.round(rail.deckAt(sc)),
-          rise = Math.max(2, Math.round(tall * sc)),
-          along = (x - from) / Math.max(1, to - from);
-        if (x < from) {
-          paint(x, deck - Math.max(1, Math.round(rise * 0.22)), frame);
-          continue;
+          rise = Math.round(tall * sc),
+          span = Math.max(1, Math.round(rail.xAt(front) - rail.xAt(front - long))),
+          gap = Math.round(rail.xAt(front) - rail.xAt(front - pitch));
+        for (let c = Math.max(-gap, -to); c <= 0 && to + c <= rail.land; c++) {
+          const x = to + c,
+            base = deck + Math.round(c * lean),
+            height = Math.max(2, rise - Math.round((c * tall) / rail.run)),
+            along = (c + span) / span;
+          if (along < 0) {
+            paint(x, base - Math.max(1, Math.round(height * 0.22)), colour.frame);
+            continue;
+          }
+          const truck = Math.abs(along - 0.16) < 0.1 || Math.abs(along - 0.84) < 0.1;
+          for (let r = 0; r < Math.ceil(height * 1.1); r++) {
+            const up = (r + 0.5) / height,
+              part = up < 0.2 ? (truck || up > 0.12 || height < 5 ? 'frame' : null) : CAR_PART[kind](along, up);
+            if (part) paint(x, base - 1 - r, colour[part]);
+          }
         }
-        const truck = Math.abs(along - 0.16) < 0.1 || Math.abs(along - 0.84) < 0.1;
-        for (let r = 0; r < Math.ceil(rise * 1.1); r++) {
-          const up = (r + 0.5) / rise,
-            part = up < 0.2 ? (truck || up > 0.12 || rise < 5 ? 'frame' : null) : CAR_PART[kind](along, up);
-          if (part) paint(x, deck - 1 - r, colour[part]);
-        }
-      }
-      if (!i && dark && to < rail.land)
-        paint(to + 1, Math.round(rail.deckAt(rail.scaleAtColumn(to)) - tall * rail.scaleAtColumn(to) * 0.45), LAMP);
-    });
+        if (!i && dark && to < rail.land) paint(to + 1, deck - Math.round(rise * 0.45), lamp);
+      });
+    }
   };
 
-  const draw = (d, t, { hour, weather, moon, pokes }) => {
+  const draw = (d, t, { hour, weather, moon, pokes, spawns }) => {
     let ki = 0;
     while (ki < KEYS.length - 2 && hour >= KEYS[ki + 1][0]) ki++;
     const kf = (hour - KEYS[ki][0]) / (KEYS[ki + 1][0] - KEYS[ki][0]);
     const A = TONE[KEYS[ki][1]],
       Z = TONE[KEYS[ki + 1][1]];
-    const wx = WX[weather];
+    const frozen = season === 'winter';
+    const wx = (frozen && COLD_WX[weather]) || WX[weather];
     const light = A.light + (Z.light - A.light) * kf;
     const ink = mix(A.ink, Z.ink, kf);
+    // Divides time into 4.5s windows with a hashed offset up to 2.5s; a 0.34s bolt flashes twice (0..0.1s and 0.17..0.26s).
     const strike = Math.floor(t / 4.5),
       since = t - strike * 4.5 - hash(strike, 71) * 2.5;
     const bolt = wx.bolts && since >= 0 && since < 0.34;
     const flash = bolt ? (since < 0.1 || (since > 0.17 && since < 0.26) ? 1 : 0.3) : 0;
-    const grey = mix(hex(wx.grey ? wx.grey[0] : '#1c2030'), hex(wx.grey ? wx.grey[1] : '#8f99a8'), light);
+    const grey = mix(...(wx.grey ?? GREY), light);
     let sky = SKY[KEYS[ki][1]].map((c, j) => mix(c, SKY[KEYS[ki + 1][1]][j], kf));
     if (wx.over) sky = sky.map((c) => mix(c, grey, wx.over));
     if (flash) sky = sky.map((c) => mix(c, FLASH, 0.45 * flash));
     const n = sky.length,
-      se = SEASON[season],
-      frozen = season === 'winter';
+      se = SEASON[season];
     const sil = clamp(A.sil + (Z.sil - A.sil) * kf + wx.over * 0.15 + (flash ? 0.5 : 0), 0, 0.96);
     const lit = (c) => mix(c, ink, sil);
     const hazy = (c) => mix(lit(c), sky[n - 1], 0.2);
     const rime = (c) => (wx.frost ? mix(c, RIME, wx.frost) : c);
     const glint = (x, y) => wx.glaze && hash(x, y) > 0.93 && Math.sin(t * 2.2 + x * 1.3 + y * 0.7) > 0.2;
     const dark = light < 0.3;
-    const sand = season === 'winter' ? SNOWBANK : SAND;
+    const sand = frozen ? SNOWBANK : SAND;
     const M = [
       null,
       hazy(rime(se.far)),
@@ -435,20 +508,25 @@ export function createScene(w, h) {
       hazy(PALE),
       mix(lit(STEEL), sky[n - 1], 0.3),
     ];
-    const deep = mix(mix(hex('#151b33'), hex('#2a5c8f'), light), grey, wx.over * 0.5);
-    const ice = mix(hex('#3a4468'), hex('#dfe7f0'), light);
+    const deep = mix(mix(...DEEP, light), grey, wx.over * 0.5);
+    const ice = mix(...ICE, light);
     const shore = mix(M[1], ink, 0.5);
     const starK = clamp(1 - light * 3, 0, 1) * clamp(1 - wx.over * 1.3, 0, 1);
-    const sunUp = hour > 5.5 && hour < 20.5;
-    const arc = sunUp ? (hour - 5.5) / 15 : ((hour + 3.5) % 24) / 9;
+    const sunUp = hour > SCENE_SUNRISE && hour < SCENE_SUNSET;
+    // `arc` runs 0..1 from rise to set, sweeping across the middle 72% of canvas width and a `sin(pi * arc)` altitude curve.
+    // `wane = cos(2 * pi * moon)` is +1 at new moon (0), 0 at quarter moon (0.25/0.75), and -1 at full moon (0.5).
+    // `(1 + wane) / 2` is the unlit fraction of the moon, scaling `auroraK` from 100% at new moon down to 30% under a full moon.
+    const arc = sunUp ? (hour - SCENE_SUNRISE) / SCENE_DAY_HOURS : ((hour + 24 - SCENE_SUNSET) % 24) / (24 - SCENE_DAY_HOURS);
     const bx = w * (0.14 + 0.72 * arc),
       by = HZ - Math.sin(Math.PI * arc) * HZ * 0.78 + q(3),
       br = q(6),
-      wane = Math.cos(2 * Math.PI * moon);
-    const body = wx.ember ? EMBER : sunUp ? mix(hex('#fff3c4'), hex('#ff9a4a'), 1 - Math.sin(Math.PI * arc)) : STAR;
+      wane = Math.cos(2 * Math.PI * moon),
+      auroraK = starK * (0.3 + 0.7 * ((1 + wane) / 2));
+    const body = wx.ember ? EMBER : sunUp ? mix(...SUN, 1 - Math.sin(Math.PI * arc)) : STAR;
     const glow = mix(sky[n - 2], body, 0.45);
     const orb = wx.over < 0.65 || wx.ember,
       halo = q(30);
+    // Cloud noise threshold `T` drops as `wx.cover` increases so more of the [0, 1] noise field exceeds `T`.
     const T = 0.92 - wx.cover * 0.55,
       wind = t * 0.02 * (1 + (wx.rain || 0));
     const cLit = mix(sky[4], WHITE, (0.1 + 0.55 * light) * (1 - wx.over * 0.75)),
@@ -461,8 +539,10 @@ export function createScene(w, h) {
       fogCol = mix(sky[n - 1], grey, 0.5);
 
     const skyAt = (x, y) => {
-      const th = B[(y & 3) * 4 + (x & 3)] / 16;
+      const th = dither(x, y);
+      // Fog density decays exponentially with height above the horizon (`y < HZ` makes `y - HZ` negative).
       if (fog && th < fog * Math.exp((y - HZ) / (HZ * 0.3))) return fogCol;
+      // Two-octave value noise (62% coarse + 38% fine) with a 5% Bayer dither nudge to break up flat contour bands.
       const cn =
         noise((x * 0.03) / k + wind, (y * 0.085) / k + 3.7) * 0.62 +
         noise((x * 0.085) / k + wind * 1.7, (y * 0.21) / k + 9.1) * 0.38 +
@@ -472,6 +552,7 @@ export function createScene(w, h) {
           tip = HZ * 0.6;
         if (y < base + Math.sin((x * 0.05) / k + t * 0.2) * q(3)) return th < 0.7 ? mDark : mMid;
         if (y < tip) {
+          // `p` runs 0 at the cloud base to 1 at the funnel tip; cone half-width narrows as `(1 - p)^1.7`.
           const p = (y - base) / (tip - base),
             half = q(18) * Math.pow(1 - p, 1.7) + q(0.5),
             off = Math.abs(x - funnelAt(y, p));
@@ -479,6 +560,7 @@ export function createScene(w, h) {
         }
       }
       if (wx.pouches) {
+        // Mammatus pouches: 4 staggered rows of semi-circular lobes (`sqrt(1 - a^2)` over normalized cell width `a` in [-1, 1]).
         const cell = q(27),
           base = HZ * 0.4;
         let hang = 1e9;
@@ -495,17 +577,38 @@ export function createScene(w, h) {
           return up < 0.25 ? mLit : th < (0.75 - up) * 2 ? mLit : th < 1.6 - up ? mMid : mDark;
         }
       }
-      if (cn > T) return noise((x * 0.03) / k + wind, ((y + 3 * k) * 0.085) / k + 3.7) * 0.62 + 0.19 < T ? cShade : cLit;
+      // Sampling the coarse cloud octave 3 units lower (`y + 3 * k`) detects the bottom rim of a cloud to shade its underside.
+      if (wx.cover && cn > T) return noise((x * 0.03) / k + wind, ((y + 3 * k) * 0.085) / k + 3.7) * 0.62 + 0.19 < T ? cShade : cLit;
       if (wx.wisps && light < 0.35 && y > HZ * 0.4 && y < HZ * 0.9) {
         const veil = noise((x * 0.012) / k + t * 0.01, (y * 0.06) / k + 31);
         const ripple = Math.sin((x * 0.22 + y * 0.6) / k + noise((x * 0.02) / k, (y * 0.05) / k) * 7);
         if (veil > 0.5 && ripple > 0.2 && th < (veil - 0.5) * 4) return ripple > 0.75 ? NLC_HI : NLC;
       }
       if (wx.bow && light > 0.3) {
+        // Places the rainbow arc opposite the sun (`0.74w` when sun is left of centre, `0.26w` when right), radius 120 units.
         const dx = x - w * (bx < w / 2 ? 0.74 : 0.26),
           dy = y - HZ - q(50),
           ring = Math.sqrt(dx * dx + dy * dy) - q(120);
         if (ring >= 0 && ring < q(10) && th < 0.55) return BOW[Math.min(4, Math.floor(ring / q(2)))];
+      }
+      const v = clamp(y / HZ, 0, 1) * (n - 1),
+        i = Math.floor(v);
+      let col = v - i > th ? sky[Math.min(i + 1, n - 1)] : sky[i];
+      if (auroraK && !wx.wisps) {
+        const slow = t * AURORA.pace,
+          sway = HZ * AURORA.wobble;
+        // Baseline `ac` undulates via two sine waves; `band` applies an asymmetric Gaussian vertical envelope
+        // (tighter above `ac`, longer below), and `streak` modulates vertical ray curtains via phase-warped sine waves.
+        const ac = HZ * 0.3 + Math.sin((x * 0.03) / k + slow * 0.35) * sway * 0.09 + Math.sin((x * 0.011) / k - slow * 0.2) * sway * 0.07;
+        const dy = (y - ac) / (HZ * 0.06);
+        const band = y > ac ? Math.exp(-dy * dy * 0.18) : Math.exp(-dy * dy * 0.5);
+        const streak = 0.5 + 0.5 * Math.sin((x * 0.7) / k + Math.sin((x * 0.09) / k + slow * 0.8) * 4);
+        const a = band * streak * (0.75 + 0.25 * Math.sin(slow * 0.6 + x * 0.02)) * auroraK;
+        if (a > th * 0.9 + 0.12) {
+          if (dy < -0.7) return AUR_CROWN;
+          if (dy > 2.6) return AUR_HEM;
+          return a > 0.78 ? AURHI : Math.sin((x * 0.013) / k + slow * 0.1) > 0.4 ? AUR_TEAL : AUR;
+        }
       }
       if (orb) {
         const dx = x - bx,
@@ -516,26 +619,14 @@ export function createScene(w, h) {
           if (Math.abs(dy) < q(3) && off < q(2.5)) return off < q(1) ? WHITE : DOG;
           if (Math.abs(Math.sqrt(d2) - halo) < u && dy < q(8) && th < 0.3) return glow;
         }
+        // `limb` is the lunar terminator x-offset at row `dy`: `sqrt(br^2 - dy^2)` is the disk's chord half-width,
+        // scaled by `wane = cos(2 * pi * moon)`. Waxing moons (`moon < 0.5`) are lit on the right (`dx > limb`), waning on the left.
         const limb = Math.sqrt(Math.max(0, br * br - dy * dy)) * wane;
-        if (d2 <= br * br && (sunUp || (moon < 0.5 ? dx > limb : dx < -limb))) return body;
+        if (d2 <= br * br) return sunUp || (moon < 0.5 ? dx > limb : dx < -limb) ? body : col;
         if (sunUp && !wx.ember && d2 < br * br * 6 && th < (1 - Math.sqrt(d2) / (br * 2.45)) * 0.8) return glow;
       }
-      const v = clamp(y / HZ, 0, 1) * (n - 1),
-        i = Math.floor(v);
-      let col = v - i > th ? sky[Math.min(i + 1, n - 1)] : sky[i];
-      if (starK && !wx.wisps) {
-        const ac = HZ * 0.3 + Math.sin((x * 0.03) / k + t * 0.35) * HZ * 0.09 + Math.sin((x * 0.011) / k - t * 0.2) * HZ * 0.07;
-        const dy = (y - ac) / (HZ * 0.06);
-        const band = y > ac ? Math.exp(-dy * dy * 0.18) : Math.exp(-dy * dy * 0.5);
-        const streak = 0.5 + 0.5 * Math.sin((x * 0.7) / k + Math.sin((x * 0.09) / k + t * 0.8) * 4);
-        const a = band * streak * (0.75 + 0.25 * Math.sin(t * 0.6 + x * 0.02)) * starK;
-        if (a > th * 0.9 + 0.12) {
-          if (dy < -0.7) return AUR_CROWN;
-          if (dy > 2.6) return AUR_HEM;
-          return a > 0.78 ? AURHI : Math.sin((x * 0.013) / k + t * 0.1) > 0.4 ? AUR_TEAL : AUR;
-        }
-      }
       if (starK && y < HZ * 0.75) {
+        // Pseudo-random spatial hash `fract(sin(dot(p, [12.9898, 78.233])) * 43758.5453)` places stars in ~0.6% of upper-sky pixels.
         const hs = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
         const twinkles = hash(x, y) < 0.12;
         if (hs - Math.floor(hs) > 0.994 && th < starK && (!twinkles || Math.sin(t * 1.5 + x * 7.1 + y * 3.3) > -0.2)) col = STAR;
@@ -543,34 +634,36 @@ export function createScene(w, h) {
       return col;
     };
 
+    carriage.fill(0);
+    inks = [null];
+    if (fog < 1) drawTrain(t, lit, mix(lit(STEEL), ink, 0.5), dark, spawns?.trains);
+    // Palette index 7 is the near truss, which occludes the train (`carriage`), which in turn occludes piers and far steel.
+    const bridgeAt = (i) => (S[i] === 7 ? M[7] : carriage[i] ? inks[carriage[i]] : S[i] ? M[S[i]] : null);
+
     for (let y = 0; y < h; y++) {
+      // Water rows (`y > HZ`) mirror the sky across the horizon (`ry = 2 * HZ - y - 1`) with horizontal wave offset `swell`.
+      const depth = (y - HZ) / Math.max(1, h - HZ),
+        ry = Math.max(0, HZ - (y - HZ) - 1),
+        swell = frozen ? 0 : Math.round(Math.sin((y * 0.9) / k + t * 0.3) * (0.7 + depth * 1.8) * (1 + (wx.rain || 0) * 0.6) * k);
       for (let x = 0; x < w; x++) {
-        const th = B[(y & 3) * 4 + (x & 3)] / 16;
+        const th = dither(x, y);
         let col,
           m = N[y * w + x];
-        if (m) col = fog && th < fog * 0.33 ? fogCol : glint(x, y) ? WHITE : M[m];
-        else if ((m = S[y * w + x])) col = fog && th < fog * 0.5 ? fogCol : M[m];
+        if (m) col = th < fog * FOG.near ? fogCol : glint(x, y) ? WHITE : M[m];
+        else if ((col = bridgeAt(y * w + x))) col = th < fog * FOG.bridge ? fogCol : col;
         else if (y < HZ) {
           m = F[y * w + x];
-          col = m ? (fog && th < fog * 0.7 ? fogCol : M[m]) : skyAt(x, y);
-        } else if (y === HZ) col = fog && th < fog * 0.7 ? fogCol : shore;
+          col = m ? (th < fog * FOG.far ? fogCol : M[m]) : skyAt(x, y);
+        } else if (y === HZ) col = th < fog * FOG.far ? fogCol : shore;
+        else if (th < fog * FOG.water) col = fogCol;
+        else if (frozen) col = hash(x >> 1, y) < 0.06 ? M[4] : th < 0.62 + depth * 0.25 ? ice : skyAt(x, ry);
+        else if (th < 0.3 + depth * 0.35) col = deep;
         else {
-          const depth = (y - HZ) / Math.max(1, h - HZ),
-            ry = Math.max(0, HZ - (y - HZ) - 1),
-            sx = frozen
-              ? x
-              : clamp(x + Math.round(Math.sin((y * 0.9) / k + t * 0.3) * (0.7 + depth * 1.8) * (1 + (wx.rain || 0) * 0.6) * k), 0, w - 1);
-          // The angled bridge mirrors about its own piers' feet, not the far shore.
-          const under = 2 * footing[sx] - y - 1;
-          m = (under >= 0 && S[under * w + sx]) || F[ry * w + sx];
-          if (frozen) {
-            col = th < 0.62 + depth * 0.25 ? ice : skyAt(x, ry);
-            if (hash(x >> 1, y) < 0.06) col = M[4];
-          } else {
-            col = m ? M[m] : skyAt(sx, ry);
-            if (th < 0.3 + depth * 0.35) col = deep;
-          }
-          if (fog && th < fog * 0.6) col = fogCol;
+          const sx = clamp(x + swell, 0, w - 1),
+            // Reflects the bridge across its local pier waterline `footing[sx]` (`y` mirrored across `footing` is `2 * footing - y - 1`).
+            under = 2 * footing[sx] - y - 1;
+          m = F[ry * w + sx];
+          col = (under >= 0 && under < h && bridgeAt(under * w + sx)) || (m ? M[m] : skyAt(sx, ry));
         }
         const p = (y * w + x) * 4;
         d[p] = col[0];
@@ -589,7 +682,6 @@ export function createScene(w, h) {
       d[p + 1] = c[1];
       d[p + 2] = c[2];
     };
-    // Sprites live between the far bank and the near trees, so they pass behind a trunk rather than over it.
     const dot = (x, y, c) => {
       for (let a = 0; a < u; a++)
         for (let b = 0; b < u; b++) {
@@ -599,19 +691,81 @@ export function createScene(w, h) {
         }
     };
 
+    const open = (x, y) => {
+      x = Math.round(x);
+      y = Math.round(y);
+      return y >= 0 && y < h && x >= 0 && x < w && !N[y * w + x] && !S[y * w + x];
+    };
+    const water = (x, y) => Math.round(y) > HZ && open(x, y);
+    // Draws a foreshortened elliptical ring (`10:3` aspect ratio, 40 samples around `2 * pi`) expanding with `age`.
+    const ripple = (x, y, age) => {
+      for (let a = 0; a < 40; a++) {
+        const rx = x + Math.cos(a * 0.157) * age * 10 * k,
+          ry = y + Math.sin(a * 0.157) * age * 3 * k;
+        if (hash(a, Math.floor(age * 5)) > 0.3 && water(rx, ry)) plot(rx, ry, cLit);
+      }
+    };
+    const leapAt = (age, seed, forced = false) => {
+      let x = w * (0.18 + 0.34 * hash(seed, 63));
+      const y = HZ + (h - HZ) * (0.18 + 0.35 * hash(seed, 64));
+      if (!open(x, y)) x += q(18);
+      if ((!forced && hash(seed, 62) > 0.4) || age < 0 || age > LEAP + 3 || !water(x, y)) return;
+      const fish = FISH[Math.floor(hash(seed, 65) * FISH.length)],
+        near = 0.5 + (y - HZ) / (h - HZ),
+        heading = hash(seed, 66) < 0.5 ? -1 : 1,
+        travel = q(16) * near,
+        height = q(9) * near,
+        length = q(fish.length) * near;
+      ripple(x, y, age);
+      if (age > LEAP) ripple(x + heading * travel, y, age - LEAP);
+      if (age > LEAP) return;
+      // Normalizing the arc's tangent vector `(dx, dy)` aligns `(ax, ay)` with the fish's spine and `(nx, ny)` perpendicular to it.
+      // `girth` follows an ellipse profile `sqrt(1 - (2s / length)^2)`, clipped at the waterline (`py < y`).
+      const p = age / LEAP,
+        fx = x + heading * travel * p,
+        fy = y - Math.sin(Math.PI * p) * height,
+        dx = heading * travel,
+        dy = -Math.cos(Math.PI * p) * Math.PI * height,
+        norm = Math.hypot(dx, dy),
+        [ax, ay] = [dx / norm, dy / norm],
+        [nx, ny] = [heading * ay, -heading * ax];
+      const fishAt = (s, o, c) => {
+        const px = fx + ax * s + nx * o,
+          py = fy + ay * s + ny * o;
+        if (py < y && open(px, py)) plot(px, py, c);
+      };
+      for (let s = -length / 2; s <= length / 2; s += 0.5) {
+        const girth = length * 0.16 * Math.sqrt(1 - ((2 * s) / length) ** 2);
+        for (let o = -girth; o <= girth; o += 0.5) fishAt(s, o, lit(o > -0.5 ? fish.back : fish.belly));
+      }
+      for (const side of [-1, 1]) fishAt(-length / 2 - 1, side * length * 0.12, lit(fish.back));
+    };
+
+    const walkSquatch = (sx) => {
+      if (sx < -10 * u || sx > w + 10 * u) return;
+      const fur = hazy(SASQUATCH),
+        frame = SQUATCH_FRAMES[Math.floor(t * 3.5) & 1],
+        foot = HZ - u;
+      frame.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] !== 'X') continue;
+          const px = sx + c * u,
+            py = foot - (frame.length - 1 - r) * u;
+          if (open(px, py)) dot(px, py, fur);
+        }
+      });
+    };
+
     if (fog < 1) {
       if (!frozen) {
-        const cx = Math.round(((t * 2.5 * k + w * 0.62) % (w + 40 * u)) - 20 * u),
-          cy = HZ + Math.round((h - HZ) * 0.2);
-        for (let i = -5; i <= 5; i++) dot(cx + i * u, cy, M[9]);
-        dot(cx - 6 * u, cy - u, M[9]);
-        dot(cx + 6 * u, cy - u, M[9]);
-        dot(cx - u, cy - u, M[9]);
-        dot(cx - u, cy - 2 * u, M[9]);
-        dot(cx + u, cy - u, M[9]);
+        const jump = Math.floor(t / LEAP_EVERY);
+        leapAt(t - jump * LEAP_EVERY - hash(jump, 61) * (LEAP_EVERY - LEAP - 3), jump);
       }
-      drawTrain(t, plot, lit, mix(lit(STEEL), ink, 0.5), dark);
+      for (const f of spawns?.fishes ?? []) leapAt(t - f.t, f.seed, true);
+      if (SQUATCH) walkSquatch(Math.round(((t * 3.5 * k) % (w + 40 * u)) - 20 * u));
+      for (const born of spawns?.squatches ?? []) walkSquatch(Math.round(w * 0.2 + (t - born) * 3.5 * k));
       if ((season === 'spring' || season === 'autumn') && light > 0.3) {
+        // V-formation of 7 geese: `rank = (i + 1) >> 1` pairs birds 1..6 into 3 ranks behind the leader (i = 0).
         const gx = w + 20 * u - ((t * 6 * k + w * 0.75) % (w + 160 * u)),
           gy = HZ * 0.3 + Math.sin(t * 0.3) * 4 * u;
         for (let i = 0; i < 7; i++) {
@@ -630,7 +784,7 @@ export function createScene(w, h) {
             dot(
               hash(i, 31) * w + Math.sin(t * 0.5 + i) * 4 * u,
               h * (0.72 + hash(i, 32) * 0.24) + Math.sin(t * 0.7 + i) * 3 * u,
-              hex('#e8f59a'),
+              FIREFLY,
             );
       }
     }
@@ -640,6 +794,7 @@ export function createScene(w, h) {
       for (let i = 0; i < count; i++) {
         const sp = (160 + 80 * hash(i, 3)) * k,
           y = (hash(i, 2) * h + t * sp) % h;
+        // Positive modulo `((a % N) + N) % N` wraps wind-slanted streaks across [-20, w + 20).
         const x = ((((hash(i, 1) * (w + 40) - t * sp * 0.25) % (w + 40)) + w + 40) % (w + 40)) - 20;
         plot(x, y, c);
         plot(x, y - 1, c);
@@ -648,7 +803,7 @@ export function createScene(w, h) {
       }
     }
     if (wx.snow) {
-      const c = mix(hex('#eef3f8'), ink, sil * 0.35),
+      const c = mix(FLAKE, ink, sil * 0.35),
         count = Math.round(((w * h) / 260) * wx.snow);
       for (let i = 0; i < count; i++) {
         const fall = wx.gale ? 26 : 10 + 16 * hash(i, 3),
@@ -666,6 +821,7 @@ export function createScene(w, h) {
           y = (hash(i, 12) * h + t * (210 + 60 * hash(i, 13)) * k) % h;
         for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) plot(x + a, y + b, WHITE);
       }
+      // Hailstones bouncing off the river surface in a `sin(pi * hop / 0.6)` arc during the first 60% of each beat.
       for (let i = 0; i < w / 6; i++) {
         const beat = t * 2.4 + hash(i, 15) * 7,
           hop = beat % 1,
@@ -681,7 +837,7 @@ export function createScene(w, h) {
         const reach = q(64);
         for (let r = u; r < reach; r++)
           for (let a = 0; a < 2 * u; a++)
-            if (B[((y - r) & 3) * 4 + ((x + a) & 3)] / 16 < (1 - r / reach) * 0.9) plot(x + a, y - r, PILLARS[i % 3]);
+            if (dither(x + a, y - r) < (1 - r / reach) * 0.9) plot(x + a, y - r, PILLARS[i % 3]);
       });
     }
     if (season === 'autumn' && !wx.rain) {
@@ -689,7 +845,7 @@ export function createScene(w, h) {
         plot(
           (hash(i, 6) * w + t * (5 + 6 * hash(i, 7)) * k + Math.sin(t + i) * 4 * k) % w,
           (hash(i, 8) * h + t * (7 + 6 * hash(i, 9)) * k) % h,
-          lit(i & 1 ? se.leafHi : hex('#b9452a')),
+          lit(i & 1 ? se.leafHi : RED_LEAF),
         );
     }
     if (wx.dust) {
@@ -710,15 +866,9 @@ export function createScene(w, h) {
     }
     for (const poke of pokes) {
       const age = t - poke.t;
-      if (poke.y < HZ) {
-        if (age < 0.9)
-          for (let j = 0; j < 10; j++) plot(poke.x + (age * 110 - j * 1.6) * k, poke.y + (age * 45 - j * 0.65) * k, j < 3 ? WHITE : STAR);
-      } else if (!frozen && age < 3) {
-        for (let a = 0; a < 40; a++)
-          if (hash(a, Math.floor(age * 5)) > 0.3)
-            plot(poke.x + Math.cos(a * 0.157) * age * 10 * k, poke.y + Math.sin(a * 0.157) * age * 3 * k, cLit);
-      }
+      if (!frozen && age < 3 && water(poke.x, poke.y)) ripple(poke.x, poke.y, age);
     }
+    // Cross-dissolves from the previous frame snapshot `prev` over 1 second using a 60% Bayer dither + 40% horizontal wipe.
     if (prev) {
       if (fadeAt < 0) fadeAt = t;
       const done = t - fadeAt;
@@ -726,7 +876,7 @@ export function createScene(w, h) {
       else
         for (let y = 0; y < h; y++)
           for (let x = 0; x < w; x++) {
-            if ((B[(y & 3) * 4 + (x & 3)] / 16) * 0.6 + (x / w) * 0.4 < done) continue;
+            if (dither(x, y) * 0.6 + (x / w) * 0.4 < done) continue;
             const p = (y * w + x) * 4;
             d[p] = prev[p];
             d[p + 1] = prev[p + 1];

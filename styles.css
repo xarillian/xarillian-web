@@ -1,25 +1,13 @@
 :root {
   --ink: #0b0f19;
   --paper: #f4ecd8;
-  --plum: #45306a;
   --lilac: #b9a8dd;
   --mint: #3fd49a;
-  --rose: #c06a78;
   --dusk: #1b1637;
-
-  --card-paper: var(--paper);
-  --card-ink: var(--ink);
-  --card-soft: var(--plum);
 
   --pixel: 'Pixelify Sans', monospace;
   --text: 'IBM Plex Sans', system-ui, sans-serif;
   --edge: 4px;
-}
-
-:root.night {
-  --card-paper: var(--dusk);
-  --card-ink: var(--paper);
-  --card-soft: var(--lilac);
 }
 
 body {
@@ -29,15 +17,22 @@ body {
   font-family: var(--text);
 }
 
+/* Offset right on wide viewports so the near bridge spans and train remain uncovered on the left. */
+body:has(.plaque) {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 48px clamp(24px, 7vw, 128px) 48px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow-x: hidden;
+}
+
 a {
   color: inherit;
   text-decoration: none;
   border-bottom: 3px solid var(--mint);
-}
-
-a:hover {
-  background: var(--mint);
-  color: var(--ink);
 }
 
 button {
@@ -45,6 +40,7 @@ button {
   cursor: pointer;
 }
 
+a:hover,
 button:hover {
   background: var(--mint);
   color: var(--ink);
@@ -56,215 +52,322 @@ button:focus-visible {
   outline-offset: 3px;
 }
 
-/* The painting */
-#scene {
+#river {
   position: fixed;
   top: 0;
   left: 0;
   image-rendering: pixelated;
-  cursor: crosshair;
 }
 
-main {
+/* 0.78 alpha is the lowest opacity that keeps text above WCAG AA over pure white scene pixels (--paper 8.5:1, --mint 5.3:1). */
+.plaque {
+  --radius: 20px;
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  width: 100%;
+  max-width: 560px;
   box-sizing: border-box;
-  padding: 72px 16px 96px;
+  padding: 28px 32px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgb(14 11 32 / 0.78);
+  color: var(--paper);
+  border: var(--edge) solid var(--paper);
+  border-radius: var(--radius);
+  box-shadow: 12px 12px 0 var(--ink);
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s,
+    visibility 0s;
+}
+
+.plaque.folded {
+  transform: translateX(calc(100% + 140px));
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s 0.1s,
+    visibility 0s 0.35s;
+}
+
+.fold,
+.unfold {
+  position: absolute;
+  top: -18px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 4px 4px 0 var(--ink);
 }
 
-/* The card */
-.card {
-  position: relative;
-  width: 100%;
-  max-width: 800px;
-  box-sizing: border-box;
-  padding: 28px 34px 34px;
+.fold {
+  right: 20px;
+}
+
+.unfold {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Expands the 32px chip to a 44px touch target. */
+.fold::after,
+.unfold::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+.fold svg,
+.unfold svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+
+.rail {
+  position: fixed;
+  right: 12px;
+  top: 24px;
+  padding: 24px 6px 6px;
   display: flex;
   flex-direction: column;
-  gap: 26px;
-  background: var(--card-paper);
-  color: var(--card-ink);
-  border: var(--edge) solid var(--card-ink);
-  box-shadow: 12px 12px 0 var(--ink);
-  pointer-events: auto;
-  transition: transform 0.5s steps(6), opacity 0.5s steps(6), visibility 0s;
-}
-
-.card.away {
-  transform: translate(-30vw, 40vh) scale(0.2) rotate(-12deg);
+  align-items: center;
+  gap: 4px;
+  background: rgb(14 11 32 / 0.78);
+  color: var(--paper);
+  border: var(--edge) solid var(--paper);
+  border-radius: 14px;
+  box-shadow: 8px 8px 0 var(--ink);
+  transform: translateX(calc(100% + 24px));
   opacity: 0;
   visibility: hidden;
-  transition: transform 0.5s steps(6), opacity 0.5s steps(6), visibility 0s 0.5s;
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s,
+    visibility 0s 0.35s;
 }
 
-.card-close {
-  position: absolute;
-  top: -48px;
-  right: calc(-1 * var(--edge));
+.rail.here {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s,
+    opacity 0.2s 0.1s,
+    visibility 0s;
+}
+
+.rail a {
   width: 44px;
   height: 44px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink);
+  background: none;
   color: var(--paper);
-  border: var(--edge) solid var(--ink);
+  border: 0;
+  border-radius: 8px;
 }
 
-.card-close svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.5;
-  stroke-linecap: square;
+.rail img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
 }
 
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
+/* Turns the #f4ecd8 SVG icon paths dark against the --mint hover background. */
+.rail a:hover img,
+.rail a:focus-visible img {
+  filter: brightness(0);
 }
 
-.card-title {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+@media (prefers-reduced-motion: reduce) {
+  .plaque.folded,
+  .rail {
+    transform: none;
+  }
+
+  .plaque,
+  .rail.here {
+    transition:
+      opacity 0.12s,
+      visibility 0s;
+  }
+
+  .plaque.folded,
+  .rail {
+    transition:
+      opacity 0.12s,
+      visibility 0s 0.12s;
+  }
+}
+
+.plaque header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 22px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.plaque header img {
+  grid-row: 1 / 3;
+  width: 112px;
+  height: 112px;
+  box-sizing: border-box;
+  border: var(--edge) solid var(--paper);
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 6px 6px 0 var(--ink);
 }
 
 h1 {
   margin: 0;
   font-family: var(--pixel);
   font-weight: 700;
-  font-size: clamp(36px, 5vw, 60px);
+  font-size: clamp(34px, 4.5vw, 52px);
   line-height: 1;
   letter-spacing: 0.01em;
 }
 
-.tagline {
-  margin: 0;
+.plaque h1 {
+  align-self: end;
+}
+
+.plaque h1,
+.plaque header p {
+  text-shadow: 3px 3px 0 var(--ink);
+}
+
+.plaque header p {
+  align-self: start;
+  margin: 6px 0 0;
   font-family: var(--pixel);
   font-size: 20px;
-  color: var(--card-soft);
+  color: var(--mint);
 }
 
-.stamp {
-  flex: 0 0 auto;
+.plaque > p {
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.stamp img {
-  display: block;
-  width: 96px;
-  aspect-ratio: 1;
-  object-fit: cover;
-  padding: 6px;
-  background: var(--card-paper);
-  box-shadow: 0 0 0 var(--edge) var(--card-ink), 6px 6px 0 var(--edge) var(--rose);
-  filter: contrast(1.2) saturate(0.8);
-}
-
-.stamp figcaption {
-  font-family: var(--pixel);
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  color: var(--card-soft);
-}
-
-.card-body {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
-  gap: 24px 40px;
-}
-
-.message {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   font-size: 17px;
   line-height: 1.6;
 }
 
-.message p {
-  margin: 0;
-}
-
-.links {
-  margin: 0;
-  padding: 0 0 0 28px;
+.plaque ul {
+  margin: 6px 0 0;
+  padding: 14px 0 0;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  border-left: var(--edge) solid var(--card-ink);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  row-gap: 2px;
+  border-top: var(--edge) solid var(--paper);
   font-family: var(--pixel);
   font-size: 20px;
 }
 
-.links li {
-  padding: 6px 0;
-}
-
-.links li::before {
-  content: '> ';
-}
-
-/* The small card that brings the big one back */
-.mini-card {
-  position: fixed;
-  left: 16px;
-  bottom: 16px;
+.plaque li {
+  position: relative;
   min-height: 44px;
-  padding: 8px 14px 8px 8px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: var(--paper);
-  color: var(--ink);
-  border: var(--edge) solid var(--ink);
-  box-shadow: 6px 6px 0 var(--ink);
-  font-size: 17px;
-  transform: rotate(-3deg);
+  flex-wrap: wrap;
+  column-gap: 0.35em;
 }
 
-.mini-card img {
-  display: block;
-  width: 36px;
-  aspect-ratio: 1;
-  object-fit: cover;
-  filter: contrast(1.2) saturate(0.8);
+/* 12x12 SVG icons rendered at 2x to keep integer pixel edges. */
+.plaque li img {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: 0.25em;
+  image-rendering: pixelated;
 }
 
-/* Season, weather and hour */
-/* The instruments are painted on the canvas; these buttons are the invisible hands over them. */
-.controls button {
+/* Expands the link hit target across the entire list item, including unlinked prefix words. */
+.plaque li a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+@media (max-width: 900px) {
+  body:has(.plaque) {
+    padding-inline: 16px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  body:has(.plaque) {
+    padding: 24px 16px 16px;
+  }
+
+  .plaque {
+    --radius: 16px;
+    padding: 16px 18px;
+    gap: 8px;
+  }
+
+  .plaque header {
+    column-gap: 14px;
+    margin-bottom: 2px;
+  }
+
+  .plaque header img {
+    width: clamp(60px, 18vw, 76px);
+    height: clamp(60px, 18vw, 76px);
+    border-radius: 10px;
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .plaque h1 {
+    font-size: clamp(26px, 7.5vw, 34px);
+  }
+
+  .plaque header p {
+    margin-top: 4px;
+    font-size: 16px;
+  }
+
+  .plaque > p {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .plaque ul {
+    margin-top: 2px;
+    padding-top: 6px;
+    column-gap: 12px;
+    row-gap: 0;
+    font-size: 16px;
+  }
+}
+
+/* Transparent hit targets positioned over the instrument tiles painted on #river in ?debug mode. */
+.almanac button {
   position: fixed;
   padding: 0;
   background: none;
   border: 0;
 }
 
-.controls button:focus-visible {
+.almanac button:focus-visible {
   outline-offset: 2px;
 }
 
-.controls button::after {
-  content: attr(data-name);
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
+.almanac button::after,
+.weather-credit {
   padding: 2px 8px;
   background: var(--dusk);
   color: var(--paper);
@@ -276,9 +379,93 @@ h1 {
   visibility: hidden;
 }
 
-.controls button:hover::after,
-.controls button:focus::after {
+.corner {
+  position: fixed;
+  right: 8px;
+  bottom: 6px;
+  margin: 0;
+  color: var(--paper);
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-shadow: 1px 1px 0 var(--ink);
+}
+
+.corner a {
+  border-bottom-width: 1px;
+}
+
+.almanac button::after {
+  content: attr(data-name);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+}
+
+.almanac button:hover::after,
+.almanac button:focus::after {
   visibility: visible;
+}
+
+/* Replaces the #weather pseudo-element tooltip when displaying live data so the tooltip can contain an <a> link. */
+.weather-credit {
+  display: none;
+  position: fixed;
+  margin: 0;
+  transform: translate(-100%, calc(-100% - 8px));
+}
+
+.weather-credit::before {
+  content: attr(data-name) ' · thanks ';
+}
+
+/* Fills the 8px hover gap between the #weather button and the tooltip so the pointer can cross into the link. */
+.weather-credit::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 12px;
+}
+
+.almanac.live .weather-credit {
+  display: block;
+}
+
+.almanac.live #weather::after {
+  display: none;
+}
+
+#weather:hover + .weather-credit,
+#weather:focus + .weather-credit,
+.weather-credit:hover,
+.weather-credit:focus-within {
+  visibility: visible;
+}
+
+.not-found {
+  padding: 64px 24px;
+  color: var(--paper);
+}
+
+.not-found h1 {
+  margin-bottom: 20px;
+}
+
+.not-found p {
+  margin: 0 0 12px;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.not-found .home {
+  text-align: center;
+}
+
+.not-found .status {
+  margin-bottom: 8px;
+  font-family: var(--pixel);
+  font-size: 20px;
+  color: var(--lilac);
 }
 
 [hidden] {

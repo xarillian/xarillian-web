@@ -1,14 +1,11 @@
-// Screenshots the scene in headless Chrome and fails when a scene pixel is not a whole, square block of screen pixels.
-// Run with `node checks/pixels.mjs`; set CHROME to use another browser binary.
-
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
+import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 
 const SCENE_PIXEL = 4;
-// Real windows are a whole number of screen pixels, so each size here is too once scaled.
 const SCREENS = [
   { width: 1280, height: 1000, scale: 1 },
   { width: 1281, height: 1001, scale: 1 },
@@ -18,7 +15,7 @@ const SCREENS = [
   { width: 400, height: 860, scale: 2 },
 ];
 const SITE = path.resolve(import.meta.dirname, '..');
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
 
 const site = await serveSite();
 const browser = await openBrowser();
@@ -42,17 +39,17 @@ process.exitCode = failures ? 1 : 0;
 
 async function inspect({ width, height, scale }) {
   await browser.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale, mobile: false });
-  await browser.send('Page.navigate', { url: `http://127.0.0.1:${site.address().port}/` });
+  await browser.send('Page.navigate', { url: `http://127.0.0.1:${site.address().port}/?debug` });
   await browser.evaluate(`new Promise((done) => {
-    const wait = () => (document.querySelector('#scene').width > 1 && !document.querySelector('.controls').hidden ? setTimeout(done, 400) : setTimeout(wait, 50));
+    const wait = () => (document.querySelector('#river').style.width ? setTimeout(done, 400) : setTimeout(wait, 50));
     wait();
   })`);
-  await browser.evaluate(`document.querySelectorAll('main, .controls, .mini-card').forEach((el) => (el.style.visibility = 'hidden'))`);
+  await browser.evaluate(`document.querySelectorAll('main, .rail, .almanac, .corner').forEach((el) => (el.style.visibility = 'hidden'))`);
   const { data } = await browser.send('Page.captureScreenshot', { format: 'png' });
   return browser.evaluate(`(${countStrayPixels})('data:image/png;base64,${data}', ${Math.max(1, Math.round(SCENE_PIXEL * scale))})`);
 }
 
-// Runs in the page, so the browser decodes its own screenshot.
+// Verifies that every `block x block` cell of physical screenshot pixels is a single uniform colour.
 async function countStrayPixels(screenshot, block) {
   const shot = new Image();
   shot.src = screenshot;
@@ -115,7 +112,7 @@ async function openBrowser() {
 
 async function firstPage(portFile) {
   for (let tries = 0; tries < 80; tries++) {
-    await new Promise((tick) => setTimeout(tick, 125));
+    await sleep(125);
     if (!fs.existsSync(portFile)) continue;
     const [port] = fs.readFileSync(portFile, 'utf8').split('\n');
     const targets = await fetch(`http://127.0.0.1:${port}/json`).then(

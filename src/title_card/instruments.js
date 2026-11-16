@@ -1,11 +1,9 @@
-// The three instruments in the corner of the scene: season, weather and time, drawn in the scene's own pixels.
-
 export const TILE = 12;
 const GAP = 2;
-const MARGIN = 3;
+const MARGIN = 2;
 
 const PLATE = [27, 22, 55];
-const RIM = [112, 96, 160];
+const RIM = [244, 236, 216];
 const RIM_LIT = [63, 212, 154];
 const INK = {
   W: [244, 236, 216],
@@ -234,19 +232,112 @@ W.........
 LLLLLLLLLL
 .R.RRRR.R.
 ...R..R...`;
-const MOON = `
-.....WWW..
-...WWW....
-..WWW.....
-..WW....W.
+const MOON_AUTO = `
+.Y...WWW..
+Y.Y.WW....
+.Y.WW.....
+..WW......
 .WWW......
 .WWW......
 ..WW......
-..WWW...W.
+..WWW.....
 ...WWW....
 .....WWW..`;
+const MOON_NEW = `
+...cccc...
+.cc....cc.
+.c......c.
+c........c
+c........c
+c........c
+c........c
+.c......c.
+.cc....cc.
+...cccc...`;
+const MOON_CRESCENT = `
+...cccW...
+.cc...WW..
+.c.....WW.
+c.......WW
+c.......WW
+c.......WW
+c.......WW
+.c.....WW.
+.cc...WW..
+...cccW...`;
+const MOON_QUARTER = `
+...ccWW...
+.cc..WWWW.
+.c...WWWW.
+c....WWWWW
+c....WWWWW
+c....WWWWW
+c....WWWWW
+.c...WWWW.
+.cc..WWWW.
+...ccWW...`;
+const MOON_GIBBOUS = `
+...cWWW...
+.ccWWWWWW.
+.cWWWWWWW.
+c.WWWWWWWW
+c.WWWWWWWW
+c.WWWWWWWW
+c.WWWWWWWW
+.cWWWWWWW.
+.ccWWWWWW.
+...cWWW...`;
+const MOON_FULL = `
+...WWWW...
+.WWWWWWWW.
+.WWWWWWWW.
+WWWWWWWWWW
+WWWWWWWWWW
+WWWWWWWWWW
+WWWWWWWWWW
+.WWWWWWWW.
+.WWWWWWWW.
+...WWWW...`;
+const SQUATCH = `
+....TT....
+...TTTT...
+..TTTTTT..
+.TTTTTTTT.
+.TT.TT.TT.
+.T..TT..T.
+...TTTT...
+..TT..TT..
+..TT..TT..
+.TT....TT.`;
+const FISH = `
+....GGGG..
+..GGGGGGG.
+.GGGGGGWGG
+GGGGGGGGGG
+.GGGGGGGG.
+G.GGGG....
+GG..GG....
+G.........
+..B...B...
+B...B...B.`;
+const TRAIN = `
+..RRR.....
+.RRRR.....
+.RWW..RRR.
+.RRRRRRRR.
+.RRRRRRRRR
+.RRRRRRRRY
+.RRRRRRRR.
+.cccccccc.
+..cc..cc..
+..........`;
 
 const below = (rows, down) => '\n'.repeat(down) + rows;
+const flipped = (rows) =>
+  rows
+    .split('\n')
+    .map((row) => [...row].reverse().join(''))
+    .join('\n');
 const recoloured = (rows, swaps) => rows.replace(/[A-Za-z]/g, (ink) => swaps[ink] ?? ink);
 const STORM_CLOUD = recoloured(CLOUD, { C: 'c' });
 
@@ -281,13 +372,33 @@ const GLYPHS = {
     dawn: [SUNRISE],
     day: [SUN],
     dusk: [SUNSET],
-    night: [MOON],
+    night: [flipped(MOON_CRESCENT)],
+  },
+  moon: {
+    auto: [MOON_AUTO],
+    new: [MOON_NEW],
+    'waxing crescent': [MOON_CRESCENT],
+    'first quarter': [MOON_QUARTER],
+    'waxing gibbous': [MOON_GIBBOUS],
+    full: [MOON_FULL],
+    'waning gibbous': [flipped(MOON_GIBBOUS)],
+    'third quarter': [flipped(MOON_QUARTER)],
+    'waning crescent': [flipped(MOON_CRESCENT)],
+  },
+  squatch: {
+    'spawn squatch': [SQUATCH],
+  },
+  fish: {
+    'spawn fish': [FISH],
+  },
+  train: {
+    'spawn train': [TRAIN],
   },
 };
 
 export const INSTRUMENTS = Object.keys(GLYPHS);
 
-// Where each tile sits, in scene pixels, given how much of the scene the window shows.
+// Places the 12x12 tiles in a horizontal row inset by MARGIN scene pixels from the bottom-right corner.
 export function placeInstruments(columns, rows) {
   const top = rows - MARGIN - TILE;
   return INSTRUMENTS.map((_, i) => ({ x: columns - MARGIN - TILE - (INSTRUMENTS.length - 1 - i) * (TILE + GAP), y: top }));
