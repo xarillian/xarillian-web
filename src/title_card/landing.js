@@ -1,4 +1,5 @@
 import { moonPhase, sceneHour } from './almanac.js';
+import { eclipseAt } from './eclipses.js';
 import { liveWeather } from './forecast.js';
 import { drawInstruments, INSTRUMENTS, placeInstruments, TILE } from './instruments.js';
 import { createScene } from './scene.js';
@@ -147,6 +148,7 @@ function paint(time) {
     weather: now.weather,
     moon: moon(),
     blackHole: now.hole === 'black hole on',
+    eclipse: eclipseAt(),
     pokes,
     spawns,
   });

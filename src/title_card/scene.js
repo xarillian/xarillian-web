@@ -133,6 +133,8 @@ export function createScene(w, h) {
     FIREFLY = hex('#e8f59a'),
     FLAKE = hex('#eef3f8'),
     RED_LEAF = hex('#b9452a');
+  // Earth's umbra on the moon: dark copper at its heart, redder toward its edge.
+  const COPPER = ['#6e2a24', '#a8503a'].map(hex);
   // [dark, light] colour endpoints blended by `light` (or by solar altitude for `SUN`).
   const GREY = ['#1c2030', '#8f99a8'].map(hex),
     DEEP = ['#151b33', '#2a5c8f'].map(hex),
@@ -466,7 +468,7 @@ export function createScene(w, h) {
     }
   };
 
-  const draw = (d, t, { hour, weather, moon, blackHole, pokes, spawns }) => {
+  const draw = (d, t, { hour, weather, moon, blackHole, eclipse, pokes, spawns }) => {
     // A black hole takes the whole sky and its own light: no hour, weather, sun, moon or aurora. It hangs high enough to
     // clear the phone plaque, which also keeps its reflection (chopped into embers by the swell) off the bottom of the river.
     // On portrait screens the birch crowns reach across the left, so it moves right to stay clear of their twigs.
@@ -548,6 +550,8 @@ export function createScene(w, h) {
     const glow = mix(sky[n - 2], body, 0.45);
     const orb = !hole && (wx.over < 0.65 || wx.ember),
       halo = q(30);
+    // A real eclipse in progress: the moon's bite out of the sun by day, Earth's copper shadow on the moon by night.
+    const shade = eclipse?.body === (sunUp ? 'sun' : 'moon') ? eclipse : null;
     // Cloud noise threshold `T` drops as `wx.cover` increases so more of the [0, 1] noise field exceeds `T`.
     const T = 0.92 - wx.cover * 0.55,
       wind = t * 0.02 * (1 + (wx.rain || 0));
@@ -647,7 +651,12 @@ export function createScene(w, h) {
         // `limb` is the lunar terminator x-offset at row `dy`: `sqrt(br^2 - dy^2)` is the disk's chord half-width,
         // scaled by `wane = cos(2 * pi * moon)`. Waxing moons (`moon < 0.5`) are lit on the right (`dx > limb`), waning on the left.
         const limb = Math.sqrt(Math.max(0, br * br - dy * dy)) * wane;
-        if (d2 <= br * br) return sunUp || (moon < 0.5 ? dx > limb : dx < -limb) ? body : col;
+        if (d2 <= br * br) {
+          if (!sunUp && (moon < 0.5 ? dx <= limb : dx >= -limb)) return col;
+          const umbra = shade ? Math.hypot(dx / br - shade.along, dy / br - shade.across) / shade.shadow : 2;
+          if (umbra < 1) return sunUp ? col : th < umbra ? COPPER[1] : COPPER[0];
+          return body;
+        }
         if (sunUp && !wx.ember && d2 < br * br * 6 && th < (1 - Math.sqrt(d2) / (br * 2.45)) * 0.8) return glow;
       }
       const [sx, sy] = hole ? hole.lensed(x, y) : [x, y];
