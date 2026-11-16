@@ -40,6 +40,8 @@ const MOON_OF = {
   'waning crescent': 0.84,
 };
 const MOONS = ['auto', ...Object.keys(MOON_OF)];
+const HOLES = ['black hole off', 'black hole on'];
+const BLACK_HOLE_ODDS = 1 / 10_000;
 
 const canvas = document.querySelector('#river');
 const plaque = document.querySelector('.plaque');
@@ -49,7 +51,7 @@ const unfoldButton = document.querySelector('.unfold');
 const corner = document.querySelector('.corner');
 const almanac = document.querySelector('.almanac');
 const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
-const [seasonButton, weatherButton, timeButton, moonButton, squatchButton, fishButton, trainButton] = buttons;
+const [seasonButton, weatherButton, timeButton, moonButton, holeButton, squatchButton, fishButton, trainButton] = buttons;
 const dials = document.querySelector('.almanac canvas');
 const dialContext = dials.getContext('2d');
 const weatherCredit = document.querySelector('.weather-credit');
@@ -64,6 +66,7 @@ const now = {
   weather: 'clear',
   time: 'auto',
   moon: 'auto',
+  hole: HOLES[Math.random() < BLACK_HOLE_ODDS ? 1 : 0],
   squatch: 'spawn squatch',
   fish: 'spawn fish',
   train: 'spawn train',
@@ -83,6 +86,7 @@ if (debug) {
   weatherButton.addEventListener('click', () => pick({ weather: after(WEATHER[now.season], now.weather) }));
   timeButton.addEventListener('click', () => change({ time: after(TIMES, now.time) }));
   moonButton.addEventListener('click', () => change({ moon: after(MOONS, now.moon) }));
+  holeButton.addEventListener('click', () => change({ hole: after(HOLES, now.hole) }));
   squatchButton.addEventListener('click', () => {
     spawns.squatches.push(seconds());
     stale = true;
@@ -138,7 +142,14 @@ function paint(time) {
     scene.build(now.season);
     planted = now.season;
   }
-  scene.draw(image.data, seconds(), { hour: hour(), weather: now.weather, moon: moon(), pokes, spawns });
+  scene.draw(image.data, seconds(), {
+    hour: hour(),
+    weather: now.weather,
+    moon: moon(),
+    blackHole: now.hole === 'black hole on',
+    pokes,
+    spawns,
+  });
   context.putImageData(image, 0, 0);
   if (debug) paintInstruments();
 }
@@ -210,6 +221,7 @@ function describe() {
   almanac.classList.toggle('live', sky === 'live');
   timeButton.dataset.name = now.time === 'auto' ? `auto ${princeAlbertTime()}` : now.time;
   moonButton.dataset.name = now.moon;
+  holeButton.dataset.name = now.hole;
   squatchButton.dataset.name = now.squatch;
   fishButton.dataset.name = now.fish;
   trainButton.dataset.name = now.train;

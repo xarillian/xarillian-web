@@ -298,6 +298,16 @@ WWWWWWWWWW
 .WWWWWWWW.
 .WWWWWWWW.
 ...WWWW...`;
+const BLACK_HOLE = `
+...OOOO...
+..OYYYYO..
+.OY....YO.
+.Y......Y.
+OY......YO
+WWWWWWWWWW
+.OYYYYYYO.
+..O....O..
+...OOOO...`;
 const SQUATCH = `
 ....TT....
 ...TTTT...
@@ -384,6 +394,10 @@ const GLYPHS = {
     'waning gibbous': [flipped(MOON_GIBBOUS)],
     'third quarter': [flipped(MOON_QUARTER)],
     'waning crescent': [flipped(MOON_CRESCENT)],
+  },
+  hole: {
+    'black hole off': [recoloured(BLACK_HOLE, { W: 'c', Y: 'c', O: 'c' })],
+    'black hole on': [BLACK_HOLE],
   },
   squatch: {
     'spawn squatch': [SQUATCH],

@@ -1,4 +1,5 @@
 import { SCENE_DAY_HOURS, SCENE_SUNRISE } from './almanac.js';
+import { blackHole as createBlackHole, DISK_LIGHT } from './black_hole.js';
 
 const SCENE_SUNSET = SCENE_SUNRISE + SCENE_DAY_HOURS;
 const SQUATCH = Math.random() < 0.01;
@@ -49,12 +50,16 @@ export function createScene(w, h) {
     dawn: ['#2b2a5e', '#514680', '#8a5f93', '#c9778f', '#f09a7e', '#f8c387', '#fde3a6'].map(hex),
     day: ['#2f6fb7', '#3f86c9', '#58a0d6', '#7bb8e0', '#a3cfe8', '#c6e1ee', '#e3eff0'].map(hex),
     dusk: ['#1e1a4a', '#3a2a6c', '#6b3a80', '#a94a7a', '#de6a62', '#f29a56', '#f9cf7a'].map(hex),
+    // Air lit by a disk that pours out ultraviolet scatters violet, the way sunlit air scatters blue.
+    hole: ['#231a5e', '#2a2068', '#312774', '#392e82', '#43368f', '#4e409c', '#5b4ca9'].map(hex),
   };
   const TONE = {
     night: { light: 0, sil: 0.9, ink: hex('#0b0f19') },
     dawn: { light: 0.5, sil: 0.62, ink: hex('#2a2140') },
     day: { light: 1, sil: 0.05, ink: hex('#16222c') },
     dusk: { light: 0.45, sil: 0.72, ink: hex('#1e1436') },
+    // Harsh light from a blue-white source: brighter than dusk, but warm colours still wash toward violet-grey.
+    hole: { light: 0.5, sil: 0.58, ink: hex('#1d2150') },
   };
   const KEYS = [
     [0, 'night'],
@@ -94,6 +99,7 @@ export function createScene(w, h) {
   };
   for (const kind of Object.values(WX)) if (kind.grey) kind.grey = kind.grey.map(hex);
   const COLD_WX = { clear: { cover: 0, over: 0 } };
+  const NO_WX = { cover: 0, over: 0 };
   // `pace` scales the aurora animation clock; `wobble` scales the vertical wave amplitude of the curtain's lower edge.
   const AURORA = { pace: 0.3, wobble: 0.35 };
   // Fog opacity multipliers by depth layer so foreground elements cut through fog more clearly than distant ones.
@@ -460,14 +466,19 @@ export function createScene(w, h) {
     }
   };
 
-  const draw = (d, t, { hour, weather, moon, pokes, spawns }) => {
+  const draw = (d, t, { hour, weather, moon, blackHole, pokes, spawns }) => {
+    // A black hole takes the whole sky and its own light: no hour, weather, sun, moon or aurora. It hangs high enough to
+    // clear the phone plaque, which also keeps its reflection (chopped into embers by the swell) off the bottom of the river.
+    // On portrait screens the birch crowns reach across the left, so it moves right to stay clear of their twigs.
+    const hole = blackHole ? createBlackHole(Math.round(w * (w > h ? 0.35 : 0.6)), Math.round(HZ * 0.28), q(9), t) : null;
     let ki = 0;
     while (ki < KEYS.length - 2 && hour >= KEYS[ki + 1][0]) ki++;
     const kf = (hour - KEYS[ki][0]) / (KEYS[ki + 1][0] - KEYS[ki][0]);
-    const A = TONE[KEYS[ki][1]],
-      Z = TONE[KEYS[ki + 1][1]];
+    const [from, to] = hole ? ['hole', 'hole'] : [KEYS[ki][1], KEYS[ki + 1][1]];
+    const A = TONE[from],
+      Z = TONE[to];
     const frozen = season === 'winter';
-    const wx = (frozen && COLD_WX[weather]) || WX[weather];
+    const wx = hole ? NO_WX : (frozen && COLD_WX[weather]) || WX[weather];
     const light = A.light + (Z.light - A.light) * kf;
     const ink = mix(A.ink, Z.ink, kf);
     // Divides time into 4.5s windows with a hashed offset up to 2.5s; a 0.34s bolt flashes twice (0..0.1s and 0.17..0.26s).
@@ -476,7 +487,7 @@ export function createScene(w, h) {
     const bolt = wx.bolts && since >= 0 && since < 0.34;
     const flash = bolt ? (since < 0.1 || (since > 0.17 && since < 0.26) ? 1 : 0.3) : 0;
     const grey = mix(...(wx.grey ?? GREY), light);
-    let sky = SKY[KEYS[ki][1]].map((c, j) => mix(c, SKY[KEYS[ki + 1][1]][j], kf));
+    let sky = SKY[from].map((c, j) => mix(c, SKY[to][j], kf));
     if (wx.over) sky = sky.map((c) => mix(c, grey, wx.over));
     if (flash) sky = sky.map((c) => mix(c, FLASH, 0.45 * flash));
     const n = sky.length,
@@ -508,10 +519,21 @@ export function createScene(w, h) {
       hazy(PALE),
       mix(lit(STEEL), sky[n - 1], 0.3),
     ];
+    const rimM = hole ? M.map((c) => c && mix(c, DISK_LIGHT, 0.6)) : M;
+    // Solid edges facing the black hole catch its disk light, thinning out with distance. Requiring solid ground below keeps
+    // lone leaves from lighting up, which turned whole crowns orange.
+    const rimLit = (L, x, y, th) =>
+      hole &&
+      y > 0 &&
+      y < h - 1 &&
+      L[(y + 1) * w + x] &&
+      !L[(y - 1) * w + clamp(x + Math.sign(hole.x - x), 0, w - 1)] &&
+      th < 0.7 * (1 - Math.hypot(x - hole.x, y - hole.y) / (w * 0.6));
     const deep = mix(mix(...DEEP, light), grey, wx.over * 0.5);
     const ice = mix(...ICE, light);
     const shore = mix(M[1], ink, 0.5);
-    const starK = clamp(1 - light * 3, 0, 1) * clamp(1 - wx.over * 1.3, 0, 1);
+    // Under the black hole only the brightest stars outshine the lit violet air.
+    const starK = hole ? 0.3 : clamp(1 - light * 3, 0, 1) * clamp(1 - wx.over * 1.3, 0, 1);
     const sunUp = hour > SCENE_SUNRISE && hour < SCENE_SUNSET;
     // `arc` runs 0..1 from rise to set, sweeping across the middle 72% of canvas width and a `sin(pi * arc)` altitude curve.
     // `wane = cos(2 * pi * moon)` is +1 at new moon (0), 0 at quarter moon (0.25/0.75), and -1 at full moon (0.5).
@@ -521,10 +543,10 @@ export function createScene(w, h) {
       by = HZ - Math.sin(Math.PI * arc) * HZ * 0.78 + q(3),
       br = q(6),
       wane = Math.cos(2 * Math.PI * moon),
-      auroraK = starK * (0.3 + 0.7 * ((1 + wane) / 2));
+      auroraK = hole ? 0 : starK * (0.3 + 0.7 * ((1 + wane) / 2));
     const body = wx.ember ? EMBER : sunUp ? mix(...SUN, 1 - Math.sin(Math.PI * arc)) : STAR;
     const glow = mix(sky[n - 2], body, 0.45);
-    const orb = wx.over < 0.65 || wx.ember,
+    const orb = !hole && (wx.over < 0.65 || wx.ember),
       halo = q(30);
     // Cloud noise threshold `T` drops as `wx.cover` increases so more of the [0, 1] noise field exceeds `T`.
     const T = 0.92 - wx.cover * 0.55,
@@ -542,6 +564,8 @@ export function createScene(w, h) {
       const th = dither(x, y);
       // Fog density decays exponentially with height above the horizon (`y < HZ` makes `y - HZ` negative).
       if (fog && th < fog * Math.exp((y - HZ) / (HZ * 0.3))) return fogCol;
+      const swallowed = hole?.at(x, y, th);
+      if (swallowed) return swallowed;
       // Two-octave value noise (62% coarse + 38% fine) with a 5% Bayer dither nudge to break up flat contour bands.
       const cn =
         noise((x * 0.03) / k + wind, (y * 0.085) / k + 3.7) * 0.62 +
@@ -594,6 +618,7 @@ export function createScene(w, h) {
       const v = clamp(y / HZ, 0, 1) * (n - 1),
         i = Math.floor(v);
       let col = v - i > th ? sky[Math.min(i + 1, n - 1)] : sky[i];
+      if (hole && th < hole.aureole(x, y)) return mix(col, DISK_LIGHT, 0.25);
       if (auroraK && !wx.wisps) {
         const slow = t * AURORA.pace,
           sway = HZ * AURORA.wobble;
@@ -625,11 +650,12 @@ export function createScene(w, h) {
         if (d2 <= br * br) return sunUp || (moon < 0.5 ? dx > limb : dx < -limb) ? body : col;
         if (sunUp && !wx.ember && d2 < br * br * 6 && th < (1 - Math.sqrt(d2) / (br * 2.45)) * 0.8) return glow;
       }
-      if (starK && y < HZ * 0.75) {
+      const [sx, sy] = hole ? hole.lensed(x, y) : [x, y];
+      if (starK && sy < HZ * 0.75) {
         // Pseudo-random spatial hash `fract(sin(dot(p, [12.9898, 78.233])) * 43758.5453)` places stars in ~0.6% of upper-sky pixels.
-        const hs = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-        const twinkles = hash(x, y) < 0.12;
-        if (hs - Math.floor(hs) > 0.994 && th < starK && (!twinkles || Math.sin(t * 1.5 + x * 7.1 + y * 3.3) > -0.2)) col = STAR;
+        const hs = Math.sin(sx * 12.9898 + sy * 78.233) * 43758.5453;
+        const twinkles = hash(sx, sy) < 0.12;
+        if (hs - Math.floor(hs) > 0.994 && th < starK && (!twinkles || Math.sin(t * 1.5 + sx * 7.1 + sy * 3.3) > -0.2)) col = STAR;
       }
       return col;
     };
@@ -649,11 +675,11 @@ export function createScene(w, h) {
         const th = dither(x, y);
         let col,
           m = N[y * w + x];
-        if (m) col = th < fog * FOG.near ? fogCol : glint(x, y) ? WHITE : M[m];
+        if (m) col = th < fog * FOG.near ? fogCol : glint(x, y) ? WHITE : rimLit(N, x, y, th) ? rimM[m] : M[m];
         else if ((col = bridgeAt(y * w + x))) col = th < fog * FOG.bridge ? fogCol : col;
         else if (y < HZ) {
           m = F[y * w + x];
-          col = m ? (th < fog * FOG.far ? fogCol : M[m]) : skyAt(x, y);
+          col = m ? (th < fog * FOG.far ? fogCol : rimLit(F, x, y, th) ? rimM[m] : M[m]) : skyAt(x, y);
         } else if (y === HZ) col = th < fog * FOG.far ? fogCol : shore;
         else if (th < fog * FOG.water) col = fogCol;
         else if (frozen) col = hash(x >> 1, y) < 0.06 ? M[4] : th < 0.62 + depth * 0.25 ? ice : skyAt(x, ry);
