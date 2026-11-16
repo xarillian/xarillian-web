@@ -43,6 +43,8 @@ const MOON_OF = {
 const MOONS = ['auto', ...Object.keys(MOON_OF)];
 const HOLES = ['black hole off', 'black hole on'];
 const BLACK_HOLE_ODDS = 1 / 10_000;
+const EATERS = ['sun eater off', 'sun eater on'];
+const SUN_EATER_ODDS = 1 / 100_000;
 
 const canvas = document.querySelector('#river');
 const plaque = document.querySelector('.plaque');
@@ -52,7 +54,7 @@ const unfoldButton = document.querySelector('.unfold');
 const corner = document.querySelector('.corner');
 const almanac = document.querySelector('.almanac');
 const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
-const [seasonButton, weatherButton, timeButton, moonButton, holeButton, squatchButton, fishButton, trainButton] = buttons;
+const [seasonButton, weatherButton, timeButton, moonButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
 const dials = document.querySelector('.almanac canvas');
 const dialContext = dials.getContext('2d');
 const weatherCredit = document.querySelector('.weather-credit');
@@ -68,6 +70,7 @@ const now = {
   time: 'auto',
   moon: 'auto',
   hole: HOLES[Math.random() < BLACK_HOLE_ODDS ? 1 : 0],
+  eater: EATERS[Math.random() < SUN_EATER_ODDS ? 1 : 0],
   squatch: 'spawn squatch',
   fish: 'spawn fish',
   train: 'spawn train',
@@ -77,6 +80,9 @@ let scene, image, planted, places, dialImage;
 let fitted = '';
 let lit = -1;
 let pokes = [];
+let gaze = null,
+  stare = 0,
+  strain = 0;
 const spawns = { squatches: [], fishes: [], trains: [] };
 let lastFrame = 0;
 let stale = true;
@@ -88,6 +94,7 @@ if (debug) {
   timeButton.addEventListener('click', () => change({ time: after(TIMES, now.time) }));
   moonButton.addEventListener('click', () => change({ moon: after(MOONS, now.moon) }));
   holeButton.addEventListener('click', () => change({ hole: after(HOLES, now.hole) }));
+  eaterButton.addEventListener('click', () => change({ eater: after(EATERS, now.eater) }));
   squatchButton.addEventListener('click', () => {
     spawns.squatches.push(seconds());
     stale = true;
@@ -122,6 +129,11 @@ foldButton.hidden = false;
 rail.hidden = false;
 
 canvas.addEventListener('click', poke);
+canvas.addEventListener('pointermove', (event) => {
+  gaze = scenePoint(event);
+  stale = true;
+});
+canvas.addEventListener('pointerleave', () => (gaze = null));
 addEventListener('resize', () => (stale = true));
 requestAnimationFrame(paint);
 
@@ -135,6 +147,7 @@ function paint(time) {
   requestAnimationFrame(paint);
   const due = time - lastFrame >= FRAME_MS;
   if (!due || (still && !stale)) return;
+  const elapsed = Math.min(0.5, (time - lastFrame) / 1000);
   lastFrame = time;
   stale = false;
 
@@ -148,7 +161,9 @@ function paint(time) {
     weather: now.weather,
     moon: moon(),
     blackHole: now.hole === 'black hole on',
+    sunEater: now.eater === 'sun eater on',
     eclipse: eclipseAt(),
+    strain: strainAfter(elapsed),
     pokes,
     spawns,
   });
@@ -224,6 +239,7 @@ function describe() {
   timeButton.dataset.name = now.time === 'auto' ? `auto ${princeAlbertTime()}` : now.time;
   moonButton.dataset.name = now.moon;
   holeButton.dataset.name = now.hole;
+  eaterButton.dataset.name = now.eater;
   squatchButton.dataset.name = now.squatch;
   fishButton.dataset.name = now.fish;
   trainButton.dataset.name = now.train;
@@ -253,10 +269,20 @@ function seasonFor(weather) {
 }
 
 function poke(event) {
+  pokes = [...pokes.slice(-5), { ...scenePoint(event), t: seconds() }];
+}
+
+function scenePoint(event) {
   const box = canvas.getBoundingClientRect();
-  const x = ((event.clientX - box.left) / box.width) * canvas.width;
-  const y = ((event.clientY - box.top) / box.height) * canvas.height;
-  pokes = [...pokes.slice(-5), { x, y, t: seconds() }];
+  return { x: ((event.clientX - box.left) / box.width) * canvas.width, y: ((event.clientY - box.top) / box.height) * canvas.height };
+}
+
+// Resting the pointer on the Sun Eater is looking at it with the Sight: after two seconds the strain builds over four
+// more, and it takes fifteen to fade once you look away.
+function strainAfter(seconds) {
+  stare = gaze && scene.gazing(gaze.x, gaze.y) ? stare + seconds : 0;
+  strain = stare > 2 ? Math.min(1, strain + seconds / 4) : Math.max(0, strain - seconds / 15);
+  return strain;
 }
 
 function hour() {

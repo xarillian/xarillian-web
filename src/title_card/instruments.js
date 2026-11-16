@@ -308,6 +308,17 @@ WWWWWWWWWW
 .OYYYYYYO.
 ..O....O..
 ...OOOO...`;
+const SUN_EATER = `
+.......YY.
+......YYYY
+.......YY.
+.....c..c.
+.....cccc.
+....CC....
+...CC.....
+..CC......
+.CC.......
+CC........`;
 const SQUATCH = `
 ....TT....
 ...TTTT...
@@ -398,6 +409,10 @@ const GLYPHS = {
   hole: {
     'black hole off': [recoloured(BLACK_HOLE, { W: 'c', Y: 'c', O: 'c' })],
     'black hole on': [BLACK_HOLE],
+  },
+  eater: {
+    'sun eater off': [recoloured(SUN_EATER, { Y: 'c', C: 'c' })],
+    'sun eater on': [SUN_EATER],
   },
   squatch: {
     'spawn squatch': [SQUATCH],

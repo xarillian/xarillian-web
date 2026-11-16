@@ -1,5 +1,6 @@
 import { SCENE_DAY_HOURS, SCENE_SUNRISE } from './almanac.js';
 import { blackHole as createBlackHole, DISK_LIGHT } from './black_hole.js';
+import { sunEater as createSunEater } from './sun_eater.js';
 
 const SCENE_SUNSET = SCENE_SUNRISE + SCENE_DAY_HOURS;
 const SQUATCH = Math.random() < 0.01;
@@ -132,7 +133,8 @@ export function createScene(w, h) {
     LAMP = hex('#ffd36b'),
     FIREFLY = hex('#e8f59a'),
     FLAKE = hex('#eef3f8'),
-    RED_LEAF = hex('#b9452a');
+    RED_LEAF = hex('#b9452a'),
+    FLOATER = hex('#5a5e6a');
   // Earth's umbra on the moon: dark copper at its heart, redder toward its edge.
   const COPPER = ['#6e2a24', '#a8503a'].map(hex);
   // [dark, light] colour endpoints blended by `light` (or by solar altitude for `SUN`).
@@ -168,7 +170,8 @@ export function createScene(w, h) {
     season = '',
     prev = null,
     fadeAt = -1,
-    shown = null;
+    shown = null,
+    gazed = null;
 
   const build = (s) => {
     season = s;
@@ -468,7 +471,7 @@ export function createScene(w, h) {
     }
   };
 
-  const draw = (d, t, { hour, weather, moon, blackHole, eclipse, pokes, spawns }) => {
+  const draw = (d, t, { hour, weather, moon, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
     // A black hole takes the whole sky and its own light: no hour, weather, sun, moon or aurora. It hangs high enough to
     // clear the phone plaque, which also keeps its reflection (chopped into embers by the swell) off the bottom of the river.
     // On portrait screens the birch crowns reach across the left, so it moves right to stay clear of their twigs.
@@ -550,6 +553,10 @@ export function createScene(w, h) {
     const glow = mix(sky[n - 2], body, 0.45);
     const orb = !hole && (wx.over < 0.65 || wx.ember),
       halo = q(30);
+    // The Sun Eater hangs beneath the sun only while it's up; the black hole takes the sun, and the worm, with it.
+    const eater = sunEater && sunUp && !hole ? createSunEater(w, HZ, { x: bx, y: by, r: br }, k) : null,
+      eaterHaze = 0.5 + wx.over * 0.4;
+    gazed = eater;
     // A real eclipse in progress: the moon's bite out of the sun by day, Earth's copper shadow on the moon by night.
     const shade = eclipse?.body === (sunUp ? 'sun' : 'moon') ? eclipse : null;
     // Cloud noise threshold `T` drops as `wx.cover` increases so more of the [0, 1] noise field exceeds `T`.
@@ -623,6 +630,8 @@ export function createScene(w, h) {
         i = Math.floor(v);
       let col = v - i > th ? sky[Math.min(i + 1, n - 1)] : sky[i];
       if (hole && th < hole.aureole(x, y)) return mix(col, DISK_LIGHT, 0.25);
+      const flesh = eater?.at(x, y, th, col, eaterHaze);
+      if (flesh) return flesh;
       if (auroraK && !wx.wisps) {
         const slow = t * AURORA.pace,
           sway = HZ * AURORA.wobble;
@@ -776,6 +785,32 @@ export function createScene(w, h) {
       for (const side of [-1, 1]) fishAt(-length / 2 - 1, side * length * 0.12, lit(fish.back));
     };
 
+    // Looking at the Sun Eater with the Sight costs what magic always costs: floaters drift through your vision over a
+    // fizz of visual snow, fading slowly once you look away.
+    const witchStrain = (strain) => {
+      const tint = (x, y, c, f) => {
+        x = Math.round(x);
+        y = Math.round(y);
+        if (x < 0 || x >= w || y < 0 || y >= h) return;
+        const p = (y * w + x) * 4;
+        for (let ch = 0; ch < 3; ch++) d[p + ch] += (c[ch] - d[p + ch]) * f;
+      };
+      const frame = Math.floor(t * 9);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (hash(x + frame * 131, y) < strain * 0.03) tint(x, y, WHITE, 0.3);
+      // Translucent strands, two pixels thick, sinking slowly and curling as they go.
+      for (let i = 0; i < 5; i++) {
+        let x = hash(i, 51) * w + Math.sin(t * 0.13 + i) * q(20),
+          y = (hash(i, 52) * h + t * q(2)) % h,
+          a = hash(i, 53) * 6.3;
+        for (let j = 0; j < 28; j++) {
+          a += Math.sin(t * 0.4 + i + j * 0.5) * 0.35;
+          x += Math.cos(a) * u * 0.8;
+          y += Math.sin(a) * u * 0.8;
+          for (let b = 0; b < 2 * u; b++) tint(x, y + b, FLOATER, 0.4 * strain);
+        }
+      }
+    };
+
     const walkSquatch = (sx) => {
       if (sx < -10 * u || sx > w + 10 * u) return;
       const fur = hazy(SASQUATCH),
@@ -903,6 +938,7 @@ export function createScene(w, h) {
       const age = t - poke.t;
       if (!frozen && age < 3 && water(poke.x, poke.y)) ripple(poke.x, poke.y, age);
     }
+    if (strain) witchStrain(strain);
     // Cross-dissolves from the previous frame snapshot `prev` over 1 second using a 60% Bayer dither + 40% horizontal wipe.
     if (prev) {
       if (fadeAt < 0) fadeAt = t;
@@ -927,5 +963,7 @@ export function createScene(w, h) {
       fadeAt = -1;
     }
   };
-  return { build, draw, snap };
+  // Whether a scene pixel is on the Sun Eater as last drawn.
+  const gazing = (x, y) => !!gazed?.holds(Math.round(x), Math.round(y));
+  return { build, draw, snap, gazing };
 }
