@@ -50,10 +50,13 @@ const corner = document.querySelector('.corner');
 const almanac = document.querySelector('.almanac');
 const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
 const [seasonButton, weatherButton, timeButton, moonButton, squatchButton, fishButton, trainButton] = buttons;
+const dials = document.querySelector('.almanac canvas');
+const dialContext = dials.getContext('2d');
 const weatherCredit = document.querySelector('.weather-credit');
 const context = canvas.getContext('2d');
 
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone = matchMedia('(max-width: 640px)');
 const debug = new URLSearchParams(location.search).has('debug');
 const began = performance.now();
 const now = {
@@ -66,7 +69,7 @@ const now = {
   train: 'spawn train',
 };
 
-let scene, image, planted, places;
+let scene, image, planted, places, dialImage;
 let fitted = '';
 let lit = -1;
 let pokes = [];
@@ -136,8 +139,14 @@ function paint(time) {
     planted = now.season;
   }
   scene.draw(image.data, seconds(), { hour: hour(), weather: now.weather, moon: moon(), pokes, spawns });
-  if (debug) drawInstruments(image.data, canvas.width, places, now, lit);
   context.putImageData(image, 0, 0);
+  if (debug) paintInstruments();
+}
+
+function paintInstruments() {
+  dialImage.data.fill(0);
+  drawInstruments(dialImage.data, dials.width, places, now, lit);
+  dialContext.putImageData(dialImage, 0, 0);
 }
 
 function fitScene() {
@@ -152,7 +161,7 @@ function fitScene() {
   canvas.style.width = `${(width * block) / devicePixelRatio}px`;
   canvas.style.height = `${(height * block) / devicePixelRatio}px`;
   alignRail();
-  if (debug) placeButtons(block);
+  if (debug) fitInstruments(block);
   if (width === canvas.width && height === canvas.height && scene) return;
 
   canvas.width = width;
@@ -162,10 +171,15 @@ function fitScene() {
   planted = null;
 }
 
-function placeButtons(block) {
-  // Convert scene-pixel coordinates back into CSS pixels for the DOM button overlays.
-  const css = (scenePixels) => `${(scenePixels * block) / devicePixelRatio}px`;
-  places = placeInstruments(Math.floor((innerWidth * devicePixelRatio) / block), Math.floor((innerHeight * devicePixelRatio) / block));
+// The instruments get their own canvas so phones can draw them at half the scene's pixel size, still in whole device pixels.
+function fitInstruments(sceneBlock) {
+  const block = phone.matches ? Math.max(1, Math.round(sceneBlock / 2)) : sceneBlock;
+  const css = (pixels) => `${(pixels * block) / devicePixelRatio}px`;
+  dials.width = Math.floor((innerWidth * devicePixelRatio) / block);
+  dials.height = Math.floor((innerHeight * devicePixelRatio) / block);
+  Object.assign(dials.style, { width: css(dials.width), height: css(dials.height) });
+  dialImage = dialContext.createImageData(dials.width, dials.height);
+  places = placeInstruments(dials.width, dials.height);
   buttons.forEach((button, i) =>
     Object.assign(button.style, { left: css(places[i].x), top: css(places[i].y), width: css(TILE), height: css(TILE) }),
   );

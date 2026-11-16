@@ -398,10 +398,17 @@ const GLYPHS = {
 
 export const INSTRUMENTS = Object.keys(GLYPHS);
 
-// Places the 12x12 tiles in a horizontal row inset by MARGIN scene pixels from the bottom-right corner.
+// Lines the 12x12 tiles up from the bottom-right corner, MARGIN pixels in. Tiles that don't fit across wrap onto rows
+// above, so the last tiles hold the bottom row and the overflow stacks up from the first.
 export function placeInstruments(columns, rows) {
-  const top = rows - MARGIN - TILE;
-  return INSTRUMENTS.map((_, i) => ({ x: columns - MARGIN - TILE - (INSTRUMENTS.length - 1 - i) * (TILE + GAP), y: top }));
+  const across = Math.max(1, Math.floor((columns - 2 * MARGIN + GAP) / (TILE + GAP)));
+  return INSTRUMENTS.map((_, i) => {
+    const fromEnd = INSTRUMENTS.length - 1 - i;
+    return {
+      x: columns - MARGIN - TILE - (fromEnd % across) * (TILE + GAP),
+      y: rows - MARGIN - TILE - Math.floor(fromEnd / across) * (TILE + GAP),
+    };
+  });
 }
 
 export function drawInstruments(pixels, width, places, now, lit) {

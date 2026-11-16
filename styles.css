@@ -354,7 +354,15 @@ h1 {
   }
 }
 
-/* Transparent hit targets positioned over the instrument tiles painted on #river in ?debug mode. */
+/* ?debug instrument tiles: a pixel canvas over #river, with transparent hit targets laid over each tile. */
+.almanac canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
 .almanac button {
   position: fixed;
   padding: 0;

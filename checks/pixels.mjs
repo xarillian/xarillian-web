@@ -23,12 +23,13 @@ let failures = 0;
 try {
   await browser.send('Page.enable');
   for (const screen of SCREENS) {
-    const verdict = await inspect(screen);
-    const ok = verdict.stray === 0 && verdict.colours > 8;
+    const { scene, tiles } = await inspect(screen);
+    const ok = scene.stray === 0 && scene.colours > 8 && tiles.stray === 0;
     if (!ok) failures++;
     console.log(
       `${ok ? 'ok  ' : 'FAIL'} ${screen.width}x${screen.height} @${screen.scale}: ` +
-        `${verdict.block}px blocks, ${verdict.stray} stray screen pixels, ${verdict.colours} colours`,
+        `scene ${scene.block}px blocks, ${scene.stray} stray, ${scene.colours} colours; ` +
+        `tiles ${tiles.block}px blocks, ${tiles.stray} stray`,
     );
   }
 } finally {
@@ -45,8 +46,20 @@ async function inspect({ width, height, scale }) {
     wait();
   })`);
   await browser.evaluate(`document.querySelectorAll('main, .rail, .almanac, .corner').forEach((el) => (el.style.visibility = 'hidden'))`);
+  const scene = await strayPixels(Math.max(1, Math.round(SCENE_PIXEL * scale)));
+  // The instrument tiles have their own canvas, on a finer grid on phones, so they are checked alone against that grid.
+  const tileBlock = await browser.evaluate(`(() => {
+    document.querySelector('#river').style.visibility = 'hidden';
+    document.querySelector('.almanac').style.visibility = 'visible';
+    const dials = document.querySelector('.almanac canvas');
+    return Math.round((parseFloat(dials.style.width) * devicePixelRatio) / dials.width);
+  })()`);
+  return { scene, tiles: await strayPixels(tileBlock) };
+}
+
+async function strayPixels(block) {
   const { data } = await browser.send('Page.captureScreenshot', { format: 'png' });
-  return browser.evaluate(`(${countStrayPixels})('data:image/png;base64,${data}', ${Math.max(1, Math.round(SCENE_PIXEL * scale))})`);
+  return browser.evaluate(`(${countStrayPixels})('data:image/png;base64,${data}', ${block})`);
 }
 
 // Verifies that every `block x block` cell of physical screenshot pixels is a single uniform colour.
