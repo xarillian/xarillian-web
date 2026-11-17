@@ -1,5 +1,7 @@
 import { SCENE_DAY_HOURS, SCENE_SUNRISE } from './almanac.js';
+import { aurora as createAurora } from './aurora.js';
 import { blackHole as createBlackHole, DISK_LIGHT } from './black_hole.js';
+import { starfield } from './stars.js';
 import { sunEater as createSunEater } from './sun_eater.js';
 
 const SCENE_SUNSET = SCENE_SUNRISE + SCENE_DAY_HOURS;
@@ -12,6 +14,11 @@ const SQUATCH_FRAMES = [
 // Bridge geometry as fractions of `reach`: near-bank start (`near`), perspective vanishing point (`vanish`),
 // foreshortened scale at the far shore (`end`), pier depth below the horizon at the near bank (`eye`),
 // heights of deck, truss, and pier width (`deck`, `truss`, `pier`), span count, and far-truss scale factor (`across`).
+// Where the scene is seen from, worked back from the bridge. The real one runs 343.9° from true north, so that is the
+// bearing of its vanishing point: we stand on the south bank just downstream of it, looking northwest. `yaw` is how far
+// left of the bridge the camera points, and `focal` its focal length as a fraction of `reach`; both follow from the truss
+// being about 9 m tall and the bridge 316 m long, and they put the camera's axis mid-screen with a 70° field of view.
+const CAMERA = { bridgeBearing: 343.9, yaw: 36, focal: 0.72 };
 const BRIDGE = { near: -0.1, vanish: 1.02, end: 0.14, eye: 0.047, deck: 0.1, truss: 0.156, pier: 0.06, spans: 7, across: 0.94 };
 
 export function createScene(w, h) {
@@ -101,8 +108,9 @@ export function createScene(w, h) {
   for (const kind of Object.values(WX)) if (kind.grey) kind.grey = kind.grey.map(hex);
   const COLD_WX = { clear: { cover: 0, over: 0 } };
   const NO_WX = { cover: 0, over: 0 };
-  // `pace` scales the aurora animation clock; `wobble` scales the vertical wave amplitude of the curtain's lower edge.
-  const AURORA = { pace: 0.3, wobble: 0.35 };
+  // The aurora keeps to the dead of night: scene hours either side of the night's midpoint where it is out in full, and
+  // the further hour over which it fades in before that and out after.
+  const AURORA = { midnight: (SCENE_SUNSET + SCENE_SUNRISE) / 2 + 12, full: 1.5, fade: 1 };
   // Fog opacity multipliers by depth layer so foreground elements cut through fog more clearly than distant ones.
   const FOG = { near: 0.33, bridge: 0.5, water: 0.6, far: 0.7 };
   // Jump interval (30s) and airborne duration (0.9s). Two sturgeon entries to one pike and one walleye give a 2:1:1 ratio.
@@ -125,11 +133,6 @@ export function createScene(w, h) {
   const WHITE = [255, 255, 255],
     FLASH = hex('#e6e9ff'),
     STAR = hex('#f4ecd8'),
-    AUR = hex('#3fd49a'),
-    AURHI = hex('#b8f7d4'),
-    AUR_TEAL = hex('#3fc7d4'),
-    AUR_CROWN = hex('#d6508a'),
-    AUR_HEM = hex('#8a6cf0'),
     LAMP = hex('#ffd36b'),
     FIREFLY = hex('#e8f59a'),
     FLAKE = hex('#eef3f8'),
@@ -150,6 +153,8 @@ export function createScene(w, h) {
   const SASQUATCH = hex('#2b1d16');
   // Sizes are authored against a 250px reference height; `q(v)` scales a measurement to at least 1 scene pixel.
   const k = h / 250;
+  // Clamping `reach` to `min(w, 1.9h)` preserves the bridge's aspect ratio on ultrawide and portrait screens alike.
+  const reach = Math.min(w, h * 1.9);
   const q = (v) => Math.max(1, Math.round(v * k)),
     u = q(1);
   // Static seasonal layers holding palette indices into `M`: `F` (far bank), `S` (bridge steel/piers), `N` (near bank/trees).
@@ -281,13 +286,11 @@ export function createScene(w, h) {
     HZ = Math.round(h * 0.64);
     farShore();
     const bridge = () => {
-      // Clamping `reach` to `min(w, 1.9h)` preserves the bridge's aspect ratio on ultrawide and portrait screens alike.
       // Perspective math: for distance `d` along the bridge toward `vanish`, foreshortened scale is `sc = 1 / (1 + d / run)`
       // and screen x is `vanish - run * sc`. Solving `scale(length) = BRIDGE.end` gives total track length `(1 / end - 1) * run`.
       // `footAt(sc)` interpolates pier bases linearly in scale from `HZ + eye * reach` (at sc = 1) to `HZ` (at sc = end)
       // so the last pier lands cleanly on the far shoreline.
-      const reach = Math.min(w, h * 1.9),
-        fine = (v) => (v * reach) / 320,
+      const fine = (v) => (v * reach) / 320,
         from = BRIDGE.near * reach,
         vanish = BRIDGE.vanish * reach,
         run = vanish - from,
@@ -471,7 +474,7 @@ export function createScene(w, h) {
     }
   };
 
-  const draw = (d, t, { hour, weather, moon, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
+  const draw = (d, t, { hour, sidereal, weather, moon, aurora, geomagnetic, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
     // A black hole takes the whole sky and its own light: no hour, weather, sun, moon or aurora. It hangs high enough to
     // clear the phone plaque, which also keeps its reflection (chopped into embers by the swell) off the bottom of the river.
     // On portrait screens the birch crowns reach across the left, so it moves right to stay clear of their twigs.
@@ -539,16 +542,29 @@ export function createScene(w, h) {
     const shore = mix(M[1], ink, 0.5);
     // Under the black hole only the brightest stars outshine the lit violet air.
     const starK = hole ? 0.3 : clamp(1 - light * 3, 0, 1) * clamp(1 - wx.over * 1.3, 0, 1);
+    const camera = {
+      bearing: CAMERA.bridgeBearing - CAMERA.yaw,
+      focal: CAMERA.focal * reach,
+      x: (BRIDGE.vanish - CAMERA.focal * Math.tan((CAMERA.yaw * Math.PI) / 180)) * reach,
+      y: HZ,
+    };
+    const stars = starK ? starfield(w, h, camera, sidereal, starK) : null;
     const sunUp = hour > SCENE_SUNRISE && hour < SCENE_SUNSET;
     // `arc` runs 0..1 from rise to set, sweeping across the middle 72% of canvas width and a `sin(pi * arc)` altitude curve.
     // `wane = cos(2 * pi * moon)` is +1 at new moon (0), 0 at quarter moon (0.25/0.75), and -1 at full moon (0.5).
     // `(1 + wane) / 2` is the unlit fraction of the moon, scaling `auroraK` from 100% at new moon down to 30% under a full moon.
+    // `fromMidnight` is signed scene hours from the middle of the night, wrapped into [-12, 12). `geomagnetic` is how
+    // strongly the live Kp index says the lights are out; a pinned `aurora` strength stands in for it, the hour and the moon,
+    // but not for the dark, open sky the lights need to show at all.
     const arc = sunUp ? (hour - SCENE_SUNRISE) / SCENE_DAY_HOURS : ((hour + 24 - SCENE_SUNSET) % 24) / (24 - SCENE_DAY_HOURS);
     const bx = w * (0.14 + 0.72 * arc),
       by = HZ - Math.sin(Math.PI * arc) * HZ * 0.78 + q(3),
       br = q(6),
       wane = Math.cos(2 * Math.PI * moon),
-      auroraK = hole ? 0 : starK * (0.3 + 0.7 * ((1 + wane) / 2));
+      fromMidnight = ((hour - AURORA.midnight + 36) % 24) - 12,
+      lateness = clamp((AURORA.full + AURORA.fade - Math.abs(fromMidnight)) / AURORA.fade, 0, 1),
+      auroraK = hole || wx.wisps ? 0 : starK * (aurora ?? geomagnetic * lateness * (0.3 + 0.7 * ((1 + wane) / 2))),
+      lights = auroraK ? createAurora(w, HZ, k, t, auroraK) : null;
     const body = wx.ember ? EMBER : sunUp ? mix(...SUN, 1 - Math.sin(Math.PI * arc)) : STAR;
     const glow = mix(sky[n - 2], body, 0.45);
     const orb = !hole && (wx.over < 0.65 || wx.ember),
@@ -632,22 +648,8 @@ export function createScene(w, h) {
       if (hole && th < hole.aureole(x, y)) return mix(col, DISK_LIGHT, 0.25);
       const flesh = eater?.at(x, y, th, col, eaterHaze);
       if (flesh) return flesh;
-      if (auroraK && !wx.wisps) {
-        const slow = t * AURORA.pace,
-          sway = HZ * AURORA.wobble;
-        // Baseline `ac` undulates via two sine waves; `band` applies an asymmetric Gaussian vertical envelope
-        // (tighter above `ac`, longer below), and `streak` modulates vertical ray curtains via phase-warped sine waves.
-        const ac = HZ * 0.3 + Math.sin((x * 0.03) / k + slow * 0.35) * sway * 0.09 + Math.sin((x * 0.011) / k - slow * 0.2) * sway * 0.07;
-        const dy = (y - ac) / (HZ * 0.06);
-        const band = y > ac ? Math.exp(-dy * dy * 0.18) : Math.exp(-dy * dy * 0.5);
-        const streak = 0.5 + 0.5 * Math.sin((x * 0.7) / k + Math.sin((x * 0.09) / k + slow * 0.8) * 4);
-        const a = band * streak * (0.75 + 0.25 * Math.sin(slow * 0.6 + x * 0.02)) * auroraK;
-        if (a > th * 0.9 + 0.12) {
-          if (dy < -0.7) return AUR_CROWN;
-          if (dy > 2.6) return AUR_HEM;
-          return a > 0.78 ? AURHI : Math.sin((x * 0.013) / k + slow * 0.1) > 0.4 ? AUR_TEAL : AUR;
-        }
-      }
+      const curtain = lights?.at(x, y, th, col);
+      if (curtain) col = curtain;
       if (orb) {
         const dx = x - bx,
           dy = y - by,
@@ -669,12 +671,8 @@ export function createScene(w, h) {
         if (sunUp && !wx.ember && d2 < br * br * 6 && th < (1 - Math.sqrt(d2) / (br * 2.45)) * 0.8) return glow;
       }
       const [sx, sy] = hole ? hole.lensed(x, y) : [x, y];
-      if (starK && sy < HZ * 0.75) {
-        // Pseudo-random spatial hash `fract(sin(dot(p, [12.9898, 78.233])) * 43758.5453)` places stars in ~0.6% of upper-sky pixels.
-        const hs = Math.sin(sx * 12.9898 + sy * 78.233) * 43758.5453;
-        const twinkles = hash(sx, sy) < 0.12;
-        if (hs - Math.floor(hs) > 0.994 && th < starK && (!twinkles || Math.sin(t * 1.5 + sx * 7.1 + sy * 3.3) > -0.2)) col = STAR;
-      }
+      const star = !curtain && stars?.at(sx, sy, col);
+      if (star && (hash(sx, sy) > 0.12 || Math.sin(t * 1.5 + sx * 7.1 + sy * 3.3) > -0.2)) col = star;
       return col;
     };
 

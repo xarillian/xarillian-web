@@ -1,8 +1,9 @@
-import { moonPhase, sceneHour } from './almanac.js';
+import { instantAtSceneHour, moonPhase, sceneHour, siderealAngle } from './almanac.js';
 import { eclipseAt } from './eclipses.js';
 import { liveWeather } from './forecast.js';
 import { drawInstruments, INSTRUMENTS, placeInstruments, TILE } from './instruments.js';
 import { createScene } from './scene.js';
+import { auroraStrength, liveKp } from './space_weather.js';
 
 const PIXEL = 4;
 const FRAME_MS = 110;
@@ -41,6 +42,9 @@ const MOON_OF = {
   'waning crescent': 0.84,
 };
 const MOONS = ['auto', ...Object.keys(MOON_OF)];
+// Auto leaves the aurora to the hour, the moon and the live Kp index; the rest pin its strength, though it still needs a dark, open sky.
+const AURORA_OF = { 'aurora off': 0, 'aurora faint': 0.4, 'aurora bright': 1, 'aurora storm': 1.6 };
+const AURORAS = ['aurora auto', ...Object.keys(AURORA_OF)];
 const HOLES = ['black hole off', 'black hole on'];
 const BLACK_HOLE_ODDS = 1 / 10_000;
 const EATERS = ['sun eater off', 'sun eater on'];
@@ -54,7 +58,7 @@ const unfoldButton = document.querySelector('.unfold');
 const corner = document.querySelector('.corner');
 const almanac = document.querySelector('.almanac');
 const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
-const [seasonButton, weatherButton, timeButton, moonButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
+const [seasonButton, weatherButton, timeButton, moonButton, auroraButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
 const dials = document.querySelector('.almanac canvas');
 const dialContext = dials.getContext('2d');
 const weatherCredit = document.querySelector('.weather-credit');
@@ -69,6 +73,7 @@ const now = {
   weather: 'clear',
   time: 'auto',
   moon: 'auto',
+  aurora: 'aurora auto',
   hole: HOLES[Math.random() < BLACK_HOLE_ODDS ? 1 : 0],
   eater: EATERS[Math.random() < SUN_EATER_ODDS ? 1 : 0],
   squatch: 'spawn squatch',
@@ -87,12 +92,15 @@ const spawns = { squatches: [], fishes: [], trains: [] };
 let lastFrame = 0;
 let stale = true;
 let sky = 'plain';
+// Until NOAA answers there is no aurora: the scene shows the lights only when they are really out.
+let kp = null;
 
 if (debug) {
   seasonButton.addEventListener('click', () => pick({ season: after(SEASONS, now.season), weather: 'clear' }));
   weatherButton.addEventListener('click', () => pick({ weather: after(WEATHER[now.season], now.weather) }));
   timeButton.addEventListener('click', () => change({ time: after(TIMES, now.time) }));
   moonButton.addEventListener('click', () => change({ moon: after(MOONS, now.moon) }));
+  auroraButton.addEventListener('click', () => change({ aurora: after(AURORAS, now.aurora) }));
   holeButton.addEventListener('click', () => change({ hole: after(HOLES, now.hole) }));
   eaterButton.addEventListener('click', () => change({ eater: after(EATERS, now.eater) }));
   squatchButton.addEventListener('click', () => {
@@ -143,6 +151,12 @@ liveWeather().then((weather) => {
   change({ season: seasonFor(weather), weather });
 });
 
+liveKp().then((index) => {
+  kp = index;
+  if (debug) describe();
+  stale = true;
+});
+
 function paint(time) {
   requestAnimationFrame(paint);
   const due = time - lastFrame >= FRAME_MS;
@@ -158,8 +172,11 @@ function paint(time) {
   }
   scene.draw(image.data, seconds(), {
     hour: hour(),
+    sidereal: siderealAngle(now.time === 'auto' ? new Date() : instantAtSceneHour(HOUR_OF[now.time])),
     weather: now.weather,
     moon: moon(),
+    aurora: AURORA_OF[now.aurora] ?? null,
+    geomagnetic: kp === null ? 0 : auroraStrength(kp),
     blackHole: now.hole === 'black hole on',
     sunEater: now.eater === 'sun eater on',
     eclipse: eclipseAt(),
@@ -238,6 +255,7 @@ function describe() {
   almanac.classList.toggle('live', sky === 'live');
   timeButton.dataset.name = now.time === 'auto' ? `auto ${princeAlbertTime()}` : now.time;
   moonButton.dataset.name = now.moon;
+  auroraButton.dataset.name = now.aurora === 'aurora auto' ? `aurora auto ${kp === null ? 'no kp' : `kp ${kp.toFixed(1)}`}` : now.aurora;
   holeButton.dataset.name = now.hole;
   eaterButton.dataset.name = now.eater;
   squatchButton.dataset.name = now.squatch;

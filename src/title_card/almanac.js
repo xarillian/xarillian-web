@@ -22,6 +22,26 @@ export function sceneHour(date = new Date()) {
   return (SCENE_SUNRISE + SCENE_DAY_HOURS + (intoNight / nightHours) * (24 - SCENE_DAY_HOURS)) % 24;
 }
 
+// The real instant, nearest `date`, at which the scene's clock reads `hour`: `sceneHour` run backwards.
+export function instantAtSceneHour(hour, date = new Date()) {
+  const { noon, halfDay } = daylight(date);
+  const intoDay = (hour - SCENE_SUNRISE + 24) % 24;
+  const fromNoon =
+    intoDay <= SCENE_DAY_HOURS
+      ? ((intoDay / SCENE_DAY_HOURS) * 2 - 1) * halfDay
+      : halfDay + ((intoDay - SCENE_DAY_HOURS) / (24 - SCENE_DAY_HOURS)) * (24 - 2 * halfDay);
+  const utcHour = date.getUTCHours() + date.getUTCMinutes() / 60;
+  const ahead = ((noon + fromNoon - utcHour + 36) % 24) - 12;
+  return new Date(date.getTime() + ahead * 3_600_000);
+}
+
+// Local sidereal angle in radians: how far the sky has turned over Prince Albert. Greenwich's was 280.46° at noon UTC on
+// 2000-01-01 and gains 360.9856° a day, one full turn plus the day's share of Earth's orbit.
+export function siderealAngle(date = new Date()) {
+  const days = (date - Date.UTC(2000, 0, 1, 12)) / 86_400_000;
+  return ((280.46061837 + 360.98564736629 * days + LONGITUDE) % 360) * RADIANS;
+}
+
 // Returns [0, 1) where 0 is new moon and 0.5 is full moon, measured from the known new moon on 2000-01-06 18:14 UTC.
 export function moonPhase(date = new Date()) {
   const NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);

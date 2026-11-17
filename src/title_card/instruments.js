@@ -298,6 +298,19 @@ WWWWWWWWWW
 .WWWWWWWW.
 .WWWWWWWW.
 ...WWWW...`;
+const CURTAIN = `
+L.L..L.L.L
+L.L.LL.L.L
+I.I.II.I.I
+G.G.GG.G.G
+G.GGGG.GGG
+GGGGGGGGGG
+MMM..MMMM.
+...MM.....`;
+const SPARK = `
+.Y........
+Y.Y.......
+.Y........`;
 const BLACK_HOLE = `
 ...OOOO...
 ..OYYYYO..
@@ -405,6 +418,13 @@ const GLYPHS = {
     'waning gibbous': [flipped(MOON_GIBBOUS)],
     'third quarter': [flipped(MOON_QUARTER)],
     'waning crescent': [flipped(MOON_CRESCENT)],
+  },
+  aurora: {
+    'aurora auto': [below(CURTAIN, 2), SPARK],
+    'aurora off': [below(recoloured(CURTAIN, { L: 'c', I: 'c', G: 'c', M: 'c' }), 1)],
+    'aurora faint': [below(recoloured(CURTAIN, { L: 'c', I: 'c', G: 'g', M: 'G' }), 1)],
+    'aurora bright': [below(CURTAIN, 1)],
+    'aurora storm': [below(recoloured(CURTAIN, { L: 'R', I: 'L', M: 'W' }), 1)],
   },
   hole: {
     'black hole off': [recoloured(BLACK_HOLE, { W: 'c', Y: 'c', O: 'c' })],
