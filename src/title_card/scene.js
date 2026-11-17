@@ -686,9 +686,11 @@ export function createScene(w, h) {
 
     for (let y = 0; y < h; y++) {
       // Water rows (`y > HZ`) mirror the sky across the horizon (`ry = 2 * HZ - y - 1`) with horizontal wave offset `swell`.
+      // The North Saskatchewan runs calm on top: the swell is near zero at the far bank and grows into long, slow waves
+      // many rows tall up close, so the reflection bends as one surface rather than shredding row by row.
       const depth = (y - HZ) / Math.max(1, h - HZ),
         ry = Math.max(0, HZ - (y - HZ) - 1),
-        swell = frozen ? 0 : Math.round(Math.sin((y * 0.9) / k + t * 0.3) * (0.7 + depth * 1.8) * (1 + (wx.rain || 0) * 0.6) * k);
+        swell = frozen ? 0 : Math.round(Math.sin((y * 0.12) / k + t * 0.2) * (0.2 + depth * 2) * (1 + (wx.rain || 0) * 0.6) * k);
       for (let x = 0; x < w; x++) {
         const th = dither(x, y);
         let col,
@@ -701,13 +703,14 @@ export function createScene(w, h) {
         } else if (y === HZ) col = th < fog * FOG.far ? fogCol : shore;
         else if (th < fog * FOG.water) col = fogCol;
         else if (frozen) col = hash(x >> 1, y) < 0.06 ? M[4] : th < 0.62 + depth * 0.25 ? ice : skyAt(x, ry);
-        else if (th < 0.3 + depth * 0.35) col = deep;
         else {
           const sx = clamp(x + swell, 0, w - 1),
             // Reflects the bridge across its local pier waterline `footing[sx]` (`y` mirrored across `footing` is `2 * footing - y - 1`).
             under = 2 * footing[sx] - y - 1;
           m = F[ry * w + sx];
           col = (under >= 0 && under < h && bridgeAt(under * w + sx)) || (m ? M[m] : skyAt(sx, ry));
+          // Deep-water stipple darkens the reflection rather than replacing it, so a bright sunset river doesn't turn to static.
+          if (th < 0.3 + depth * 0.35) col = mix(col, deep, 0.4);
         }
         const p = (y * w + x) * 4;
         d[p] = col[0];
