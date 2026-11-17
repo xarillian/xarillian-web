@@ -21,3 +21,7 @@ run:
                 self.wfile.write(body)
 
     test(Fresh, port=3333, bind='127.0.0.1')
+
+# Photographs /preview into the link preview image. Needs `just run` going in another terminal.
+preview:
+    google-chrome-stable --headless=new --hide-scrollbars --window-size=1200,630 --virtual-time-budget=6000 --screenshot=images/preview.png http://127.0.0.1:3333/preview/
