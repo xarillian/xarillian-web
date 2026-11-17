@@ -1,32 +1,31 @@
-name: Deploy to Github Pages
+name: Deploy to GitHub Pages
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      
-      - name: Set up Python
-        run: uv python install 3.12
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-      - name: Install dependencies
-        run: uv sync --frozen
-      
-      - name: Generate static site
-        run: uv run generate-site
-      
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The site has no build step: the repository root is the site.
+      - uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

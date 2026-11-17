@@ -1,0 +1,47 @@
+/* The link preview, 1200x630 in a window at least that wide and shrinking with narrower ones.
+   Sizes are written in the 1200px design and multiplied by --px, one design pixel at the current width. */
+.preview {
+  position: relative;
+  width: min(100%, 1200px);
+  aspect-ratio: 1200 / 630;
+  overflow: hidden;
+  container-type: inline-size;
+  background: var(--dusk);
+  color: var(--paper);
+  font-family: var(--pixel);
+  line-height: 1;
+}
+
+.preview > * {
+  --px: calc(100cqw / 1200);
+  position: absolute;
+}
+
+.preview canvas {
+  inset: 0 auto 0 0;
+  width: calc(760 * var(--px));
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.preview div {
+  left: calc(800 * var(--px));
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.preview h1 {
+  margin: 0;
+  font-weight: 700;
+  font-size: calc(118 * var(--px));
+  line-height: 0.88;
+  text-shadow: calc(6 * var(--px)) calc(6 * var(--px)) 0 var(--ink);
+}
+
+.preview p {
+  width: fit-content;
+  margin: calc(34 * var(--px)) 0 0;
+  padding-bottom: calc(8 * var(--px));
+  border-bottom: calc(6 * var(--px)) solid var(--mint);
+  font-size: calc(40 * var(--px));
+}

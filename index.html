@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Austin Wayne</title>
+<meta name="description" content="Developer and writer.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://xarillian.com/">
+<meta property="og:site_name" content="xarillian">
+<meta property="og:title" content="Austin Wayne">
+<meta property="og:description" content="Developer and writer.">
+<meta property="og:image" content="https://xarillian.com/images/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A pixel-art photo of Austin Wayne sitting in clover, playing with a black cat, beside his name.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://xarillian.com/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&amp;family=IBM+Plex+Sans&amp;display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="src/title_card/landing.js"></script>
+</head>
+<body>
+<canvas id="river" aria-hidden="true"></canvas>
+<main class="plaque">
+  <button class="fold" type="button" aria-label="Collapse card" hidden>
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2h2v1H3zM4 3h2v1H4zM5 4h2v1H5zM6 5h2v2H6zM5 7h2v1H5zM4 8h2v1H4zM3 9h2v1H3z"/></svg>
+  </button>
+  <header>
+    <img src="images/austin.webp" alt="">
+    <h1>Austin Wayne</h1>
+    <p>techno-optimist</p>
+  </header>
+  <p>I am a software engineer in Saskatchewan, but really I am just a man. My life is an obsessive split between engineering, prose, engineering prose, and endurance sport. My sleep/wake cycle is disturbed.</p>
+  <p>One must be high of virtue, of mind, of body. I believe technology is key to human flourishing, and in the unerring will of souls human and alien. All else follows from this.</p>
+  <ul>
+    <li><img src="images/icons/github.svg" alt=""><a href="https://github.com/xarillian" target="_blank" rel="noopener">GitHub</a></li>
+    <li><img src="images/icons/substack.svg" alt=""><a href="https://substack.com/@xarillian" target="_blank" rel="noopener">Substack</a></li>
+    <li><img src="images/icons/linkedin.svg" alt=""><a href="https://www.linkedin.com/in/austin-heinrich/" target="_blank" rel="noopener">LinkedIn</a></li>
+    <li><img src="images/icons/email.svg" alt=""><a href="mailto:austinwheinrich@gmail.com" target="_blank" rel="noopener">Email Me</a></li>
+    <li><img src="images/icons/hammer.svg" alt="">Under construction</li>
+    <li><img src="images/icons/saw.svg" alt="">Under construction</li>
+  </ul>
+</main>
+<nav class="rail" aria-label="Links" hidden>
+  <button class="unfold" type="button" aria-label="Expand card">
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M7 2h2v1H7zM6 3h2v1H6zM5 4h2v1H5zM4 5h2v2H4zM5 7h2v1H5zM6 8h2v1H6zM7 9h2v1H7z"/></svg>
+  </button>
+</nav>
+<p class="corner"><a href="?debug">debug</a> · thanks <a href="https://open-meteo.com/" target="_blank" rel="noopener">open-meteo</a>!</p>
+<aside class="almanac" aria-label="Sky conditions" hidden>
+  <canvas></canvas>
+  <button id="season" type="button"></button>
+  <button id="weather" type="button"></button>
+  <p class="weather-credit"><a href="https://open-meteo.com/" target="_blank" rel="noopener">open-meteo</a>!</p>
+  <button id="time" type="button"></button>
+  <button id="moon" type="button"></button>
+  <button id="hole" type="button"></button>
+  <button id="eater" type="button"></button>
+  <button id="squatch" type="button"></button>
+  <button id="fish" type="button"></button>
+  <button id="train" type="button"></button>
+</aside>
+</body>
+</html>
