@@ -117,7 +117,7 @@ if (debug) {
   setInterval(describe, 30_000);
 }
 
-for (const item of plaque.querySelectorAll('li')) {
+for (const item of plaque.querySelectorAll('li:has(a)')) {
   const link = item.querySelector('a').cloneNode();
   link.setAttribute('aria-label', item.textContent.trim());
   link.append(item.querySelector('img').cloneNode());

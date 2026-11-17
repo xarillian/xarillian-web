@@ -285,6 +285,11 @@ h1 {
   column-gap: 0.35em;
 }
 
+/* A row without a link is one run of text: it breaks beside its icon rather than dropping below it. */
+.plaque li:not(:has(a)) {
+  flex-wrap: nowrap;
+}
+
 /* 12x12 SVG icons rendered at 2x to keep integer pixel edges. */
 .plaque li img {
   flex: none;
