@@ -1,2 +1,0 @@
-- [x] some of the rare weather events will basically never show up from the weather report. idk how to show them off (bc we don't just want visitors to click through)
-- [ ] deploy: the rebuild deletes the gh-pages workflow and adds nothing, so merging won't publish. either a new workflow, or Pages serves master's root (then add `.nojekyll`, or Jekyll publishes todo.md as /todo)
