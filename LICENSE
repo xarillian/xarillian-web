@@ -1,32 +1,10 @@
-The following licenses apply to both xarillian.com and its source repository.
+The following terms apply to both xarillian.com and its source repository.
 
-Website Content License
-========================
-Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
-
-Copyright (c) 2025 Austin Wayne
-
-All written content on this website, including blog posts and creative writing,
-is licensed under CC BY-NC 4.0. Images and media: all rights reserved unless
-otherwise noted or on a permissive basis.
-
-You are free to:
-- Share: copy and redistribute the material in any medium or format
-- Adapt: remix, transform, and build upon the material
-
-Under the following terms:
-- Attribution: You must give appropriate credit, provide a link to the license,
-  and indicate if changes were made. You may do so in any reasonable manner, but not in
-  any way that suggests the licensor endorses you or your use.
-- NonCommercial: You may not use the material for commercial purposes.
-
-Full license: https://creativecommons.org/licenses/by-nc/4.0/legalcode
-
-Website Source Code License
-============================
+Source Code License
+===================
 MIT License
 
-Copyright (c) 2025 Austin Wayne
+Copyright (c) 2025-2026 Austin Wayne
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -45,7 +23,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-All computer code examples and snippets included within blog posts and other
-written content are licensed under the MIT License (above), not the CC BY-NC
-license. This applies to functional programming code in any language, including
-but not limited to source code, scripts, and algorithms.
+Code examples and snippets inside written content are source code and fall
+under the MIT License above.
+
+Everything Else
+===============
+Copyright (c) 2025-2026 Austin Wayne. All rights reserved.
+
+All writing, images and other media on this website and in this repository
+fall outside the MIT License. They may not be copied, redistributed or
+adapted without permission, unless a piece says otherwise.
