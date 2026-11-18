@@ -45,6 +45,9 @@ const MOONS = ['auto', ...Object.keys(MOON_OF)];
 // Auto leaves the aurora to the hour, the moon and the live Kp index; the rest pin its strength, though it still needs a dark, open sky.
 const AURORA_OF = { 'aurora off': 0, 'aurora faint': 0.4, 'aurora bright': 1, 'aurora storm': 1.6 };
 const AURORAS = ['aurora auto', ...Object.keys(AURORA_OF)];
+// Light pollution: the faintest magnitude a clear night shows. Prince Albert's own skyglow leaves only the brightest stars.
+const STAR_LIMIT_OF = { 'stars dark sky': 6, 'stars rural': 4.5, 'stars town': 3.5, 'stars city': 2.5 };
+const STAR_SKIES = Object.keys(STAR_LIMIT_OF);
 const HOLES = ['black hole off', 'black hole on'];
 const BLACK_HOLE_ODDS = 1 / 10_000;
 const EATERS = ['sun eater off', 'sun eater on'];
@@ -58,7 +61,7 @@ const unfoldButton = document.querySelector('.unfold');
 const corner = document.querySelector('.corner');
 const almanac = document.querySelector('.almanac');
 const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
-const [seasonButton, weatherButton, timeButton, moonButton, auroraButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
+const [seasonButton, weatherButton, timeButton, moonButton, auroraButton, starsButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
 const dials = document.querySelector('.almanac canvas');
 const dialContext = dials.getContext('2d');
 const weatherCredit = document.querySelector('.weather-credit');
@@ -74,6 +77,7 @@ const now = {
   time: 'auto',
   moon: 'auto',
   aurora: 'aurora auto',
+  stars: 'stars town',
   hole: HOLES[Math.random() < BLACK_HOLE_ODDS ? 1 : 0],
   eater: EATERS[Math.random() < SUN_EATER_ODDS ? 1 : 0],
   squatch: 'spawn squatch',
@@ -101,6 +105,7 @@ if (debug) {
   timeButton.addEventListener('click', () => change({ time: after(TIMES, now.time) }));
   moonButton.addEventListener('click', () => change({ moon: after(MOONS, now.moon) }));
   auroraButton.addEventListener('click', () => change({ aurora: after(AURORAS, now.aurora) }));
+  starsButton.addEventListener('click', () => change({ stars: after(STAR_SKIES, now.stars) }));
   holeButton.addEventListener('click', () => change({ hole: after(HOLES, now.hole) }));
   eaterButton.addEventListener('click', () => change({ eater: after(EATERS, now.eater) }));
   squatchButton.addEventListener('click', () => {
@@ -173,6 +178,7 @@ function paint(time) {
   scene.draw(image.data, seconds(), {
     hour: hour(),
     sidereal: siderealAngle(now.time === 'auto' ? new Date() : instantAtSceneHour(HOUR_OF[now.time])),
+    starLimit: STAR_LIMIT_OF[now.stars],
     weather: now.weather,
     moon: moon(),
     aurora: AURORA_OF[now.aurora] ?? null,
@@ -256,6 +262,7 @@ function describe() {
   timeButton.dataset.name = now.time === 'auto' ? `auto ${princeAlbertTime()}` : now.time;
   moonButton.dataset.name = now.moon;
   auroraButton.dataset.name = now.aurora === 'aurora auto' ? `aurora auto ${kp === null ? 'no kp' : `kp ${kp.toFixed(1)}`}` : now.aurora;
+  starsButton.dataset.name = now.stars;
   holeButton.dataset.name = now.hole;
   eaterButton.dataset.name = now.eater;
   squatchButton.dataset.name = now.squatch;

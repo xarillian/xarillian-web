@@ -10,9 +10,9 @@ const TINTS = [
 ];
 const BLUE = 0,
   ORANGE = 1;
-// The faintest magnitude seen on a clear dark night here, and at the first of dusk: Sirius and the planets' league.
-const DARK_LIMIT = 6,
-  DUSK_LIMIT = -1.5;
+// The faintest magnitude seen at the first of dusk: Sirius and the planets' league. The faintest on a clear night is the
+// caller's `darkLimit`, which light pollution pulls down from 6 under a truly dark sky.
+const DUSK_LIMIT = -1.5;
 // Magnitudes of dimming per air mass of atmosphere the starlight crosses, which is what empties the sky near the horizon.
 const EXTINCTION = 0.28;
 // A star this many magnitudes above the limit is drawn at full strength; fainter ones sink toward the sky in `SHADES` steps.
@@ -34,12 +34,13 @@ const CATALOGUE = Array.from({ length: STARS.length / 4 }, (_, i) => {
 // The real stars over Prince Albert, as a level camera sees them. `camera` is its `bearing` (degrees from true north), its
 // `focal` length in pixels, and the pixel (`x`, `y`) where its axis meets the horizon. `sidereal` is the local sidereal
 // angle in radians, which is what turns the sky. `clarity` is 1 for a dark, clear night and 0 for daylight or overcast.
-export function starfield(width, height, camera, sidereal, clarity) {
+// `darkLimit` is the faintest magnitude a clear night shows through the town's skyglow.
+export function starfield(width, height, camera, sidereal, clarity, darkLimit) {
   const sinLat = Math.sin(LATITUDE * RADIANS),
     cosLat = Math.cos(LATITUDE * RADIANS),
     sinBearing = Math.sin(camera.bearing * RADIANS),
     cosBearing = Math.cos(camera.bearing * RADIANS),
-    limit = DUSK_LIMIT + (DARK_LIMIT - DUSK_LIMIT) * clarity;
+    limit = DUSK_LIMIT + (darkLimit - DUSK_LIMIT) * clarity;
   // Per pixel: 0 for empty sky, else 1 + tint * SHADES + shade. The catalogue runs brightest first, so the first star to a pixel keeps it.
   const lit = new Uint8Array(width * height);
 

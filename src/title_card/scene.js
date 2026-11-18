@@ -474,7 +474,7 @@ export function createScene(w, h) {
     }
   };
 
-  const draw = (d, t, { hour, sidereal, weather, moon, aurora, geomagnetic, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
+  const draw = (d, t, { hour, sidereal, starLimit, weather, moon, aurora, geomagnetic, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
     // A black hole takes the whole sky and its own light: no hour, weather, sun, moon or aurora. It hangs high enough to
     // clear the phone plaque, which also keeps its reflection (chopped into embers by the swell) off the bottom of the river.
     // On portrait screens the birch crowns reach across the left, so it moves right to stay clear of their twigs.
@@ -548,7 +548,7 @@ export function createScene(w, h) {
       x: (BRIDGE.vanish - CAMERA.focal * Math.tan((CAMERA.yaw * Math.PI) / 180)) * reach,
       y: HZ,
     };
-    const stars = starK ? starfield(w, h, camera, sidereal, starK) : null;
+    const stars = starK ? starfield(w, h, camera, sidereal, starK, starLimit) : null;
     const sunUp = hour > SCENE_SUNRISE && hour < SCENE_SUNSET;
     // `arc` runs 0..1 from rise to set, sweeping across the middle 72% of canvas width and a `sin(pi * arc)` altitude curve.
     // `wane = cos(2 * pi * moon)` is +1 at new moon (0), 0 at quarter moon (0.25/0.75), and -1 at full moon (0.5).
