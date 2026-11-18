@@ -19,6 +19,8 @@ const SQUATCH_FRAMES = [
 // left of the bridge the camera points, and `focal` its focal length as a fraction of `reach`; both follow from the truss
 // being about 9 m tall and the bridge 316 m long, and they put the camera's axis mid-screen with a 70° field of view.
 const CAMERA = { bridgeBearing: 343.9, yaw: 36, focal: 0.72 };
+// How many scene units the river can stand above (flood) or below (low water) its usual shoreline.
+const RIVER_RANGE = 6;
 const BRIDGE = { near: -0.1, vanish: 1.02, end: 0.14, eye: 0.047, deck: 0.1, truss: 0.156, pier: 0.06, spans: 7, across: 0.94 };
 
 export function createScene(w, h) {
@@ -474,7 +476,7 @@ export function createScene(w, h) {
     }
   };
 
-  const draw = (d, t, { hour, sidereal, weather, moon, aurora, geomagnetic, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
+  const draw = (d, t, { hour, sidereal, starLimit, river, weather, moon, aurora, geomagnetic, blackHole, sunEater, eclipse, strain, pokes, spawns }) => {
     // A black hole takes the whole sky and its own light: no hour, weather, sun, moon or aurora. It hangs high enough to
     // clear the phone plaque, which also keeps its reflection (chopped into embers by the swell) off the bottom of the river.
     // On portrait screens the birch crowns reach across the left, so it moves right to stay clear of their twigs.
@@ -548,7 +550,7 @@ export function createScene(w, h) {
       x: (BRIDGE.vanish - CAMERA.focal * Math.tan((CAMERA.yaw * Math.PI) / 180)) * reach,
       y: HZ,
     };
-    const stars = starK ? starfield(w, h, camera, sidereal, starK) : null;
+    const stars = starK ? starfield(w, h, camera, sidereal, starK, starLimit) : null;
     const sunUp = hour > SCENE_SUNRISE && hour < SCENE_SUNSET;
     // `arc` runs 0..1 from rise to set, sweeping across the middle 72% of canvas width and a `sin(pi * arc)` altitude curve.
     // `wane = cos(2 * pi * moon)` is +1 at new moon (0), 0 at quarter moon (0.25/0.75), and -1 at full moon (0.5).
@@ -682,12 +684,16 @@ export function createScene(w, h) {
     // Palette index 7 is the near truss, which occludes the train (`carriage`), which in turn occludes piers and far steel.
     const bridgeAt = (i) => (S[i] === 7 ? M[7] : carriage[i] ? inks[carriage[i]] : S[i] ? M[S[i]] : null);
 
+    // `river` (-1 low to 1 flood) moves the waterline `wl` off the usual shoreline `HZ`: a flood drowns the far beach and
+    // the foot of the far spruce, low water bares a wet gravel bar below it.
+    const rise = Math.round((river ?? 0) * RIVER_RANGE * k),
+      wl = HZ - rise;
     for (let y = 0; y < h; y++) {
-      // Water rows (`y > HZ`) mirror the sky across the horizon (`ry = 2 * HZ - y - 1`) with horizontal wave offset `swell`.
+      // Water rows (`y > wl`) mirror the sky across the waterline (`ry = 2 * wl - y - 1`) with horizontal wave offset `swell`.
       // The North Saskatchewan runs calm on top: the swell is near zero at the far bank and grows into long, slow waves
       // many rows tall up close, so the reflection bends as one surface rather than shredding row by row.
-      const depth = (y - HZ) / Math.max(1, h - HZ),
-        ry = Math.max(0, HZ - (y - HZ) - 1),
+      const depth = (y - wl) / Math.max(1, h - wl),
+        ry = Math.max(0, wl - (y - wl) - 1),
         swell = frozen ? 0 : Math.round(Math.sin((y * 0.12) / k + t * 0.2) * (0.2 + depth * 2) * (1 + (wx.rain || 0) * 0.6) * k);
       for (let x = 0; x < w; x++) {
         const th = dither(x, y);
@@ -695,16 +701,17 @@ export function createScene(w, h) {
           m = N[y * w + x];
         if (m) col = th < fog * FOG.near ? fogCol : glint(x, y) ? WHITE : rimLit(N, x, y, th) ? rimM[m] : M[m];
         else if ((col = bridgeAt(y * w + x))) col = th < fog * FOG.bridge ? fogCol : col;
-        else if (y < HZ) {
+        else if (y < Math.min(HZ, wl)) {
           m = F[y * w + x];
           col = m ? (th < fog * FOG.far ? fogCol : rimLit(F, x, y, th) ? rimM[m] : M[m]) : skyAt(x, y);
-        } else if (y === HZ) col = th < fog * FOG.far ? fogCol : shore;
+        } else if (y < wl) col = th < fog * FOG.far ? fogCol : th < ((y - HZ) / (wl - HZ)) * 0.8 ? shore : M[15];
+        else if (y === wl) col = th < fog * FOG.far ? fogCol : shore;
         else if (th < fog * FOG.water) col = fogCol;
         else if (frozen) col = hash(x >> 1, y) < 0.06 ? M[4] : th < 0.62 + depth * 0.25 ? ice : skyAt(x, ry);
         else {
           const sx = clamp(x + swell, 0, w - 1),
-            // Reflects the bridge across its local pier waterline `footing[sx]` (`y` mirrored across `footing` is `2 * footing - y - 1`).
-            under = 2 * footing[sx] - y - 1;
+            // Reflects the bridge across its local pier waterline `footing[sx] - rise` (`y` mirrored across it is `2 * (footing - rise) - y - 1`).
+            under = 2 * (footing[sx] - rise) - y - 1;
           m = F[ry * w + sx];
           col = (under >= 0 && under < h && bridgeAt(under * w + sx)) || (m ? M[m] : skyAt(sx, ry));
           // Deep-water stipple darkens the reflection rather than replacing it, so a bright sunset river doesn't turn to static.
@@ -741,7 +748,7 @@ export function createScene(w, h) {
       y = Math.round(y);
       return y >= 0 && y < h && x >= 0 && x < w && !N[y * w + x] && !S[y * w + x];
     };
-    const water = (x, y) => Math.round(y) > HZ && open(x, y);
+    const water = (x, y) => Math.round(y) > wl && open(x, y);
     // Draws a foreshortened elliptical ring (`10:3` aspect ratio, 40 samples around `2 * pi`) expanding with `age`.
     const ripple = (x, y, age) => {
       for (let a = 0; a < 40; a++) {

@@ -3,6 +3,7 @@ import { eclipseAt } from './eclipses.js';
 import { liveWeather } from './forecast.js';
 import { drawInstruments, INSTRUMENTS, placeInstruments, TILE } from './instruments.js';
 import { createScene } from './scene.js';
+import { liveRiverLevel, riverStage } from './river.js';
 import { auroraStrength, liveKp } from './space_weather.js';
 
 const PIXEL = 4;
@@ -45,6 +46,12 @@ const MOONS = ['auto', ...Object.keys(MOON_OF)];
 // Auto leaves the aurora to the hour, the moon and the live Kp index; the rest pin its strength, though it still needs a dark, open sky.
 const AURORA_OF = { 'aurora off': 0, 'aurora faint': 0.4, 'aurora bright': 1, 'aurora storm': 1.6 };
 const AURORAS = ['aurora auto', ...Object.keys(AURORA_OF)];
+// Light pollution: the faintest magnitude a clear night shows. Prince Albert's own skyglow leaves only the brightest stars.
+const STAR_LIMIT_OF = { 'stars dark sky': 6, 'stars rural': 4.5, 'stars town': 3.5, 'stars city': 2.5 };
+const STAR_SKIES = Object.keys(STAR_LIMIT_OF);
+// Auto follows the live gauge at Prince Albert; the rest pin the river's stage from low water (-1) to flood (1).
+const RIVER_OF = { 'river low': -1, 'river usual': 0, 'river high': 0.5, 'river flood': 1 };
+const RIVERS = ['river auto', ...Object.keys(RIVER_OF)];
 const HOLES = ['black hole off', 'black hole on'];
 const BLACK_HOLE_ODDS = 1 / 10_000;
 const EATERS = ['sun eater off', 'sun eater on'];
@@ -58,10 +65,9 @@ const unfoldButton = document.querySelector('.unfold');
 const corner = document.querySelector('.corner');
 const almanac = document.querySelector('.almanac');
 const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
-const [seasonButton, weatherButton, timeButton, moonButton, auroraButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
+const [seasonButton, weatherButton, timeButton, moonButton, auroraButton, starsButton, gaugeButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
 const dials = document.querySelector('.almanac canvas');
 const dialContext = dials.getContext('2d');
-const weatherCredit = document.querySelector('.weather-credit');
 const context = canvas.getContext('2d');
 
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -74,6 +80,8 @@ const now = {
   time: 'auto',
   moon: 'auto',
   aurora: 'aurora auto',
+  stars: 'stars town',
+  gauge: 'river auto',
   hole: HOLES[Math.random() < BLACK_HOLE_ODDS ? 1 : 0],
   eater: EATERS[Math.random() < SUN_EATER_ODDS ? 1 : 0],
   squatch: 'spawn squatch',
@@ -94,6 +102,8 @@ let stale = true;
 let sky = 'plain';
 // Until NOAA answers there is no aurora: the scene shows the lights only when they are really out.
 let kp = null;
+// The gauge's level in metres; until it answers the river sits at its usual height.
+let riverLevel = null;
 
 if (debug) {
   seasonButton.addEventListener('click', () => pick({ season: after(SEASONS, now.season), weather: 'clear' }));
@@ -101,6 +111,8 @@ if (debug) {
   timeButton.addEventListener('click', () => change({ time: after(TIMES, now.time) }));
   moonButton.addEventListener('click', () => change({ moon: after(MOONS, now.moon) }));
   auroraButton.addEventListener('click', () => change({ aurora: after(AURORAS, now.aurora) }));
+  starsButton.addEventListener('click', () => change({ stars: after(STAR_SKIES, now.stars) }));
+  gaugeButton.addEventListener('click', () => change({ gauge: after(RIVERS, now.gauge) }));
   holeButton.addEventListener('click', () => change({ hole: after(HOLES, now.hole) }));
   eaterButton.addEventListener('click', () => change({ eater: after(EATERS, now.eater) }));
   squatchButton.addEventListener('click', () => {
@@ -157,6 +169,12 @@ liveKp().then((index) => {
   stale = true;
 });
 
+liveRiverLevel().then((level) => {
+  riverLevel = level;
+  if (debug) describe();
+  stale = true;
+});
+
 function paint(time) {
   requestAnimationFrame(paint);
   const due = time - lastFrame >= FRAME_MS;
@@ -173,6 +191,8 @@ function paint(time) {
   scene.draw(image.data, seconds(), {
     hour: hour(),
     sidereal: siderealAngle(now.time === 'auto' ? new Date() : instantAtSceneHour(HOUR_OF[now.time])),
+    starLimit: STAR_LIMIT_OF[now.stars],
+    river: RIVER_OF[now.gauge] ?? (riverLevel === null ? 0 : riverStage(riverLevel)),
     weather: now.weather,
     moon: moon(),
     aurora: AURORA_OF[now.aurora] ?? null,
@@ -228,8 +248,6 @@ function fitInstruments(sceneBlock) {
   buttons.forEach((button, i) =>
     Object.assign(button.style, { left: css(places[i].x), top: css(places[i].y), width: css(TILE), height: css(TILE) }),
   );
-  const weather = places[buttons.indexOf(weatherButton)];
-  Object.assign(weatherCredit.style, { left: css(weather.x + TILE), top: css(weather.y) });
 }
 
 function light(instrument) {
@@ -251,11 +269,12 @@ function change(patch) {
 
 function describe() {
   seasonButton.dataset.name = now.season;
-  weatherButton.dataset.name = weatherCredit.dataset.name = now.weather;
-  almanac.classList.toggle('live', sky === 'live');
+  weatherButton.dataset.name = now.weather;
   timeButton.dataset.name = now.time === 'auto' ? `auto ${princeAlbertTime()}` : now.time;
   moonButton.dataset.name = now.moon;
   auroraButton.dataset.name = now.aurora === 'aurora auto' ? `aurora auto ${kp === null ? 'no kp' : `kp ${kp.toFixed(1)}`}` : now.aurora;
+  starsButton.dataset.name = now.stars;
+  gaugeButton.dataset.name = now.gauge === 'river auto' ? `river auto ${riverLevel === null ? 'no gauge' : `${riverLevel.toFixed(2)} m`}` : now.gauge;
   holeButton.dataset.name = now.hole;
   eaterButton.dataset.name = now.eater;
   squatchButton.dataset.name = now.squatch;

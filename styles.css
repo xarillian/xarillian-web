@@ -379,8 +379,7 @@ h1 {
   outline-offset: 2px;
 }
 
-.almanac button::after,
-.weather-credit {
+.almanac button::after {
   padding: 2px 8px;
   background: var(--dusk);
   color: var(--paper);
@@ -417,41 +416,6 @@ h1 {
 
 .almanac button:hover::after,
 .almanac button:focus::after {
-  visibility: visible;
-}
-
-/* Replaces the #weather pseudo-element tooltip when displaying live data so the tooltip can contain an <a> link. */
-.weather-credit {
-  display: none;
-  position: fixed;
-  margin: 0;
-  transform: translate(-100%, calc(-100% - 8px));
-}
-
-.weather-credit::before {
-  content: attr(data-name) ' · thanks ';
-}
-
-/* Fills the 8px hover gap between the #weather button and the tooltip so the pointer can cross into the link. */
-.weather-credit::after {
-  content: '';
-  position: absolute;
-  inset: 100% 0 auto;
-  height: 12px;
-}
-
-.almanac.live .weather-credit {
-  display: block;
-}
-
-.almanac.live #weather::after {
-  display: none;
-}
-
-#weather:hover + .weather-credit,
-#weather:focus + .weather-credit,
-.weather-credit:hover,
-.weather-credit:focus-within {
   visibility: visible;
 }
 
