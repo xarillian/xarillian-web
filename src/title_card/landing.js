@@ -68,7 +68,6 @@ const buttons = INSTRUMENTS.map((name) => document.querySelector(`#${name}`));
 const [seasonButton, weatherButton, timeButton, moonButton, auroraButton, starsButton, gaugeButton, holeButton, eaterButton, squatchButton, fishButton, trainButton] = buttons;
 const dials = document.querySelector('.almanac canvas');
 const dialContext = dials.getContext('2d');
-const weatherCredit = document.querySelector('.weather-credit');
 const context = canvas.getContext('2d');
 
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -249,8 +248,6 @@ function fitInstruments(sceneBlock) {
   buttons.forEach((button, i) =>
     Object.assign(button.style, { left: css(places[i].x), top: css(places[i].y), width: css(TILE), height: css(TILE) }),
   );
-  const weather = places[buttons.indexOf(weatherButton)];
-  Object.assign(weatherCredit.style, { left: css(weather.x + TILE), top: css(weather.y) });
 }
 
 function light(instrument) {
@@ -272,8 +269,7 @@ function change(patch) {
 
 function describe() {
   seasonButton.dataset.name = now.season;
-  weatherButton.dataset.name = weatherCredit.dataset.name = now.weather;
-  almanac.classList.toggle('live', sky === 'live');
+  weatherButton.dataset.name = now.weather;
   timeButton.dataset.name = now.time === 'auto' ? `auto ${princeAlbertTime()}` : now.time;
   moonButton.dataset.name = now.moon;
   auroraButton.dataset.name = now.aurora === 'aurora auto' ? `aurora auto ${kp === null ? 'no kp' : `kp ${kp.toFixed(1)}`}` : now.aurora;
