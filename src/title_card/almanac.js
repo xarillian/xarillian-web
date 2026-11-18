@@ -2,7 +2,7 @@ export const LATITUDE = 53.2;
 export const LONGITUDE = -105.75;
 const RADIANS = Math.PI / 180;
 
-// Solar position is computed locally from the date rather than fetched from Open-Meteo so the first frame
+// Solar position is computed locally from the date rather than fetched so the first frame
 // renders at the right time of day before the network responds (or when requests fail).
 // Because `scene.js` uses fixed sky-colour keyframes (dawn around 6.5, dusk around 19.0), `sceneHour` warps
 // real daytime (noon ± halfDay) onto the fixed [5.5, 20.5] window and night onto the remaining 9 hours.
