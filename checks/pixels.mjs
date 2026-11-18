@@ -42,7 +42,7 @@ async function inspect({ width, height, scale }) {
   await browser.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: scale, mobile: false });
   await browser.send('Page.navigate', { url: `http://127.0.0.1:${site.address().port}/?debug` });
   await browser.evaluate(`new Promise((done) => {
-    const wait = () => (document.querySelector('#river').style.width ? setTimeout(done, 400) : setTimeout(wait, 50));
+    const wait = () => (document.querySelector('#river')?.style.width ? setTimeout(done, 400) : setTimeout(wait, 50));
     wait();
   })`);
   await browser.evaluate(`document.querySelectorAll('main, .rail, .almanac, .corner').forEach((el) => (el.style.visibility = 'hidden'))`);
